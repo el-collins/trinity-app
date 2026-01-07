@@ -151,7 +151,7 @@ export class FirestoreService {
     // Convert Firestore timestamps to Date objects
     for (const [key, value] of Object.entries(result)) {
       if (value && typeof value === 'object' && '_seconds' in value) {
-        result[key] = new Date(value._seconds * 1000);
+        result[key] = new Date((value as any)._seconds * 1000);
       }
     }
     

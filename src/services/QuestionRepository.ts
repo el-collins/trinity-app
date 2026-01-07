@@ -1,4 +1,4 @@
-import { Question, QuestionType, QuestionCategory, RiskDimension } from '../models/Question';
+import { Question, QuestionType, QuestionCategory, RiskDimension, PrerequisiteOperator } from '../models/Question';
 import { ApplicationStage, OwnerRole } from '../models/Application';
 
 export class QuestionRepository {
@@ -200,7 +200,7 @@ export class QuestionRepository {
         informationValue: 7,
         applicableStages: [ApplicationStage.FINANCIAL_INFO],
         prerequisites: [
-          { questionId: 'q_collateral_available', operator: 'EQUALS', value: true },
+          { questionId: 'q_collateral_available', operator: PrerequisiteOperator.EQUALS, value: true },
         ],
         options: [
           { value: 'real_estate', label: 'Real Estate' },

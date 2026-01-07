@@ -276,19 +276,23 @@ export class ApplicationController {
       let result;
       
       switch (workflowType) {
-        case 'credit_check':
+        case 'credit_check': {
           result = await n8nService.triggerCreditCheck(application);
           break;
-        case 'underwriting_review':
+        }
+        case 'underwriting_review': {
           result = await n8nService.triggerUnderwritingReview(application);
           break;
-        case 'document_collection':
+        }
+        case 'document_collection': {
           const docs = req.body.documents || [];
           result = await n8nService.triggerDocumentCollection(application, docs);
           break;
-        case 'compliance_check':
+        }
+        case 'compliance_check': {
           result = await n8nService.triggerComplianceCheck(application);
           break;
+        }
         default:
           res.status(400).json({ error: 'Invalid workflow type' });
           return;

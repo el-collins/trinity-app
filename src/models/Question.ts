@@ -70,7 +70,8 @@ export enum PrerequisiteOperator {
   LESS_THAN = 'LESS_THAN',
   IN = 'IN',
   NOT_IN = 'NOT_IN',
-  EXISTS = 'EXISTS'
+  EXISTS = 'EXISTS',
+  NOT_EXISTS = 'NOT_EXISTS'
 }
 
 export interface ValidationRule {

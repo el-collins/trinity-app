@@ -1,4 +1,4 @@
-import { Question, QuestionSelectionContext, QuestionCategory } from '../models/Question';
+import { Question, QuestionSelectionContext, QuestionCategory, PrerequisiteOperator } from '../models/Question';
 import { ApplicationState } from '../models/Application';
 
 export class QuestionSelectionEngine {
@@ -94,23 +94,25 @@ export class QuestionSelectionEngine {
       const response = application.responses[prereq.questionId];
       
       if (!response) {
-        return prereq.operator === 'NOT_EXISTS';
+        return prereq.operator === PrerequisiteOperator.NOT_EXISTS;
       }
       
       switch (prereq.operator) {
-        case 'EXISTS':
+        case PrerequisiteOperator.EXISTS:
           return true;
-        case 'EQUALS':
+        case PrerequisiteOperator.NOT_EXISTS:
+          return false;
+        case PrerequisiteOperator.EQUALS:
           return response.value === prereq.value;
-        case 'NOT_EQUALS':
+        case PrerequisiteOperator.NOT_EQUALS:
           return response.value !== prereq.value;
-        case 'GREATER_THAN':
+        case PrerequisiteOperator.GREATER_THAN:
           return response.value > prereq.value;
-        case 'LESS_THAN':
+        case PrerequisiteOperator.LESS_THAN:
           return response.value < prereq.value;
-        case 'IN':
+        case PrerequisiteOperator.IN:
           return Array.isArray(prereq.value) && prereq.value.includes(response.value);
-        case 'NOT_IN':
+        case PrerequisiteOperator.NOT_IN:
           return Array.isArray(prereq.value) && !prereq.value.includes(response.value);
         default:
           return false;
@@ -128,7 +130,7 @@ export class QuestionSelectionEngine {
     // Check for missing categories based on stage
     const categoryResponses: Record<string, number> = {};
     
-    Object.values(responses).forEach(response => {
+    Object.values(responses).forEach(_response => {
       // This is a simplified version - in production, you'd track categories per response
       const category = 'BASIC_INFO'; // Would be derived from question metadata
       categoryResponses[category] = (categoryResponses[category] || 0) + 1;
@@ -211,7 +213,7 @@ export class QuestionSelectionEngine {
     let totalRiskWeight = 0;
     let weightedRiskSum = 0;
     
-    Object.entries(application.responses).forEach(([questionId, response]) => {
+    Object.entries(application.responses).forEach(([questionId, _response]) => {
       const question = allQuestions.find(q => q.id === questionId);
       
       if (question && question.riskImpact) {
