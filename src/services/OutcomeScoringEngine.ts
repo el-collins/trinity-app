@@ -145,7 +145,7 @@ export class OutcomeScoringEngine {
       totalWeight += 25;
     }
     
-    owners.forEach((owner, idx) => {
+    owners.forEach(owner => {
       if (owner.identityConfidence.score < 0.7) {
         missing.push({
           informationType: 'VERIFICATION',
@@ -201,7 +201,7 @@ export class OutcomeScoringEngine {
     
     // Years in business
     if (business.yearsInBusiness !== undefined) {
-      let score = Math.min(business.yearsInBusiness * 10, 40); // Cap at 40 points for 4+ years
+      const score = Math.min(business.yearsInBusiness * 10, 40); // Cap at 40 points for 4+ years
       factors.push({
         factorId: 'years_in_business',
         factorType: 'QUESTION_ANSWER',
