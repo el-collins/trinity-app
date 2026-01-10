@@ -1,0 +1,123 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { generateFormSchema } from '@/lib/validation/schemaGenerator';
+import { neo4jConfigService } from '@/lib/services/Neo4jConfigService';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { loanTypeId, responses, submittedAt } = body;
+
+    if (!loanTypeId || !responses) {
+      return NextResponse.json(
+        { error: 'Missing required fields: loanTypeId, responses' },
+        { status: 400 }
+      );
+    }
+
+    // Fetch form structure for validation
+    const structure = await neo4jConfigService.getLoanTypeConfig(loanTypeId);
+    
+    if (!structure) {
+      return NextResponse.json(
+        { error: 'Invalid loan type' },
+        { status: 400 }
+      );
+    }
+
+    // Server-side validation with Zod
+    try {
+      const loanTypeDefinition = {
+        id: structure.loanType.id,
+        name: structure.loanType.name,
+        tier: structure.loanType.tier,
+        sections: structure.sections,
+      };
+      
+      const schema = generateFormSchema(loanTypeDefinition);
+      schema.parse(responses);
+    } catch (validationError: any) {
+      return NextResponse.json(
+        { 
+          error: 'Validation failed', 
+          details: validationError.issues || validationError.message 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Create application object
+    const application = {
+      loanTypeId,
+      responses,
+      status: 'submitted',
+      submittedAt: submittedAt || new Date().toISOString(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    // Save to Firestore
+    const docRef = await addDoc(collection(db, 'applications'), application);
+    const applicationId = docRef.id;
+
+    console.log('Application submitted to Firestore:', applicationId);
+
+    return NextResponse.json({
+      success: true,
+      applicationId,
+      message: 'Application submitted successfully',
+    });
+  } catch (error) {
+    console.error('Application submission error:', error);
+    return NextResponse.json(
+      { 
+        error: 'Internal server error', 
+        message: error instanceof Error ? error.message : 'Unknown error' 
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// GET endpoint to retrieve application by ID
+export async function GET(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const applicationId = searchParams.get('id');
+
+    if (!applicationId) {
+      return NextResponse.json(
+        { error: 'Application ID required' },
+        { status: 400 }
+      );
+    }
+
+    // Retrieve from Firestore
+    const docRef = doc(db, 'applications', applicationId);
+    const docSnap = await getDoc(docRef);
+
+    if (!docSnap.exists()) {
+      return NextResponse.json(
+        { error: 'Application not found' },
+        { status: 404 }
+      );
+    }
+
+    const application = {
+      id: docSnap.id,
+      ...docSnap.data(),
+      // Convert Firestore timestamps to ISO strings
+      createdAt: docSnap.data().createdAt?.toDate().toISOString(),
+      updatedAt: docSnap.data().updatedAt?.toDate().toISOString(),
+    };
+
+    return NextResponse.json(application);
+  } catch (error) {
+    console.error('Error retrieving application:', error);
+    return NextResponse.json(
+      { error: 'Failed to retrieve application' },
+      { status: 500 }
+    );
+  }
+}

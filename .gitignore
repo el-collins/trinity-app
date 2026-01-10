@@ -1,9 +1,10 @@
-node_modules/
-dist/
-.env
-.env.local
-*.log
-coverage/
+# Security & Local Config
+firestore.rules
+
+# Scripts & Documentation
+Cypher scripts/
+docs/
+
+# System Files
 .DS_Store
-.vscode/
-.idea/
+Thumbs.db

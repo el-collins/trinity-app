@@ -1,0 +1,46 @@
+/**
+ * Application configuration
+ */
+
+export const config = {
+  port: process.env.PORT || 3000,
+  nodeEnv: process.env.NODE_ENV || 'development',
+  
+  neo4j: {
+    uri: process.env.NEO4J_URI || 'bolt://localhost:7687',
+    user: process.env.NEO4J_USER || 'neo4j',
+    password: process.env.NEO4J_PASSWORD || 'password',
+  },
+  
+  firestore: {
+    projectId: process.env.FIRESTORE_PROJECT_ID || '',
+    credentialsPath: process.env.GOOGLE_APPLICATION_CREDENTIALS || '',
+  },
+  
+  goHighLevel: {
+    apiKey: process.env.GHL_API_KEY || '',
+    locationId: process.env.GHL_LOCATION_ID || '',
+  },
+  
+  api: {
+    baseUrl: process.env.API_BASE_URL || 'http://localhost:3000',
+  },
+  
+  n8n: {
+    webhookUrl: process.env.N8N_WEBHOOK_URL || '',
+    apiKey: process.env.N8N_API_KEY,
+  },
+};
+
+/**
+ * Validate required environment variables
+ */
+export function validateConfig() {
+  const required = ['NEO4J_URI', 'NEO4J_USER', 'NEO4J_PASSWORD'];
+  
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    console.warn(`Warning: Missing environment variables: ${missing.join(', ')}`);
+  }
+}
