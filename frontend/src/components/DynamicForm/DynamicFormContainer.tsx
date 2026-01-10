@@ -32,17 +32,28 @@ export default function DynamicFormContainer({
     goToSection,
     loadFromURL,
     syncToURL,
+    resetForm, // Added resetForm
   } = useFormStore();
 
   const [showReview, setShowReview] = useState(false);
   const [aiPlanning, setAiPlanning] = useState(false);
-  const [aiEnabled, setAiEnabled] = useState(
-    process.env.NEXT_PUBLIC_ENABLE_AI_PLANNING === 'true'
-  );
+  
+  // AI is always enabled based on env var (no UI toggle)
+  const aiEnabled = process.env.NEXT_PUBLIC_ENABLE_AI_PLANNING === 'true';
 
   // Fetch form structure on mount
   useEffect(() => {
     const fetchFormStructure = async () => {
+      // Check for mismatch and reset BEFORE anything else
+      const { loanTypeId: storedLoanTypeId, resetForm } = useFormStore.getState();
+      const token = getResumeTokenFromURL();
+
+      // If switching loan types without a resume token, clear everything immediately
+      if (!token && storedLoanTypeId && storedLoanTypeId !== loanTypeId) {
+        console.log('Loan type mismatch detected during init, resetting form...');
+        resetForm();
+      }
+
       setLoading(true);
       try {
         const response = await fetch(`/api/neo4j/loan-config?loanTypeId=${loanTypeId}`);
@@ -271,25 +282,7 @@ export default function DynamicFormContainer({
             </p>
           </div>
           
-          {/* AI Toggle */}
-          <div className="flex items-center gap-2 bg-gray-50 px-4 py-2 rounded-lg">
-            <span className="text-sm text-gray-600">AI Planning</span>
-            <button
-              onClick={() => setAiEnabled(!aiEnabled)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                aiEnabled ? 'bg-blue-600' : 'bg-gray-300'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  aiEnabled ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-            {aiEnabled && (
-              <span className="text-xs text-blue-600 font-medium">✨ Active</span>
-            )}
-          </div>
+          {/* AI Toggle Removed - Always Active via Env Var */}
         </div>
         
         {/* Progress Bar */}

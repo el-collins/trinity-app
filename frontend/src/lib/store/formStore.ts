@@ -258,8 +258,9 @@ export const useFormStore = create<FormStore>()(
       }
     }
     
-    // Clear localStorage
+    // Clear localStorage AND reset store state
     localStorage.removeItem('trinity-form-storage');
+    set(initialState);
     
     // Redirect to success page
     window.location.href = `/success?id=${applicationId}`;
