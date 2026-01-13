@@ -18,7 +18,6 @@ export interface GHLContactData {
   postalCode?: string;
   source?: string;
   website?: string;
-  contactType?: string;
 }
 
 interface GHLContactResponse {
@@ -27,8 +26,6 @@ interface GHLContactResponse {
     email: string;
     phone: string;
     website: string;
-    contactType: string;
-    // ... other fields as needed
   };
 }
 
