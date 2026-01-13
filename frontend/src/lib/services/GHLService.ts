@@ -101,9 +101,28 @@ export class GHLService {
 
       return response.data.contact.id;
     } catch (error: any) {
+      // Handle "This location does not allow duplicated contacts" error (400)
+      if (error.response?.status === 400 && 
+          error.response?.data?.message?.includes('duplicated contacts')) {
+        
+        const existingContactId = error.response.data.meta?.contactId;
+        console.log(`Contact duplicate detected. Updating existing contact ${existingContactId}`);
+        
+        if (existingContactId) {
+            // If we have the ID, update the existing contact
+            // Note: Update endpoint doesn't support all fields exactly same as POST, 
+            // but for our purpose (tags, custom fields) it should be fine.
+            // We strip 'source' as it might not be updateable or needed here.
+            
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { source, ...updateData } = data;
+            
+            await this.updateContact(existingContactId, updateData);
+            return existingContactId;
+        }
+      }
+
       console.error('Error syncing contact to GHL:', error.response?.data || error.message);
-      // Fallback: If creation fails, maybe we need to try finding and updating explicitly?
-      // Usually POST is sufficient for upsart.
       throw error;
     }
   }

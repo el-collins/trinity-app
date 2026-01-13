@@ -24,7 +24,7 @@ export const config = {
       applicationId: process.env.GHL_FIELD_APPLICATION_ID || '',
       applicationStatus: process.env.GHL_FIELD_APPLICATION_STATUS || '',
       loanType: process.env.GHL_FIELD_LOAN_TYPE || '',
-      submissionDate: process.env.GHL_FIELD_SUBMISSION_DATE || '',
+      submissionDate: process.env.GHL_FIELD_SUBMISSION_DATE || new Date().toISOString().split('T')[0],
     },
   },
   
