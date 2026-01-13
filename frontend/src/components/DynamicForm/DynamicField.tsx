@@ -10,6 +10,7 @@ import DatePicker from './fields/DatePicker';
 import MultiSelect from './fields/MultiSelect';
 import { validateField } from '@/lib/validation/schemaGenerator';
 import FileUpload from './fields/FileUpload';
+import { PhoneNumberInput } from '../ui/phone-input';
 
 
 interface DynamicFieldProps {
@@ -49,8 +50,8 @@ export default function DynamicField({ field }: DynamicFieldProps) {
   switch (fieldType) {
     case 'TEXT':
     case 'EMAIL':
-    case 'PHONE':
-    case 'TEL':
+    // case 'PHONE': // Moved below
+    // case 'TEL':   // Moved below
     case 'SSN':
     case 'EIN':
     case 'ADDRESS':
@@ -65,6 +66,29 @@ export default function DynamicField({ field }: DynamicFieldProps) {
           onChange={handleChange}
           onBlur={handleBlur}
         />
+      );
+
+    case 'PHONE':
+    case 'TEL':
+      return (
+         <div className="w-full">
+            <label htmlFor={field.id} className="block text-sm font-medium text-gray-700 mb-2">
+                {field.label}
+                {field.required && <span className="text-red-500 ml-1">*</span>}
+            </label>
+            {field.helpText && (
+                <p className="text-sm text-gray-500 mb-2">{field.helpText}</p>
+            )}
+            <PhoneNumberInput
+                value={value}
+                onChange={handleChange}
+                placeholder={field.placeholder}
+                error={!!error}
+            />
+            {error && (
+                <p className="mt-1 text-sm text-red-600">{error}</p>
+            )}
+         </div>
       );
 
     case 'DATE':

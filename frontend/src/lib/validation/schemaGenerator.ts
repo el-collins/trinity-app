@@ -136,7 +136,14 @@ export function generateFieldSchema(field: FormField): z.ZodTypeAny {
 
   // Make optional if not required
   if (!field.required) {
-    schema = schema.optional().or(z.literal(''));
+    // Use nullish to accept undefined/null and transform them to empty string
+    // Then validate as optional string
+    schema = z.union([
+      schema,
+      z.literal(''),
+      z.undefined(),
+      z.null()
+    ]).transform(val => val === undefined || val === null ? '' : val);
   }
 
   return schema;
@@ -176,7 +183,9 @@ export function generateFormSchema(loanType: LoanTypeDefinition): z.ZodObject<an
 export function validateField(field: FormField, value: any): string | null {
   try {
     const schema = generateFieldSchema(field);
-    schema.parse(value);
+    // Normalize undefined/null to empty string for optional fields
+    const normalizedValue = (value === undefined || value === null) ? '' : value;
+    schema.parse(normalizedValue);
     return null;
   } catch (error) {
     if (error instanceof z.ZodError) {

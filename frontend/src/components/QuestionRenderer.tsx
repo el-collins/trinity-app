@@ -1,6 +1,7 @@
 import React from 'react';
 import { Question } from '@/types/question';
 import { Input } from '@/components/ui/input';
+import { PhoneNumberInput } from '@/components/ui/phone-input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -26,10 +27,28 @@ export function QuestionRenderer({
     switch (question.type) {
       case 'TEXT':
       case 'EMAIL':
+      case 'ADDRESS':
+        return (
+          <Input
+            value={value || ''}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={`Enter ${question.text.toLowerCase()}`}
+            className={cn(error && "border-destructive focus-visible:ring-destructive")}
+          />
+        );
+
       case 'PHONE':
+        return (
+          <PhoneNumberInput
+            value={value || ''}
+            onChange={(val) => onChange(val)}
+            placeholder={`Enter ${question.text.toLowerCase()}`}
+            error={!!error}
+          />
+        );
+
       case 'SSN':
       case 'EIN':
-      case 'ADDRESS':
         return (
           <Input
             value={value || ''}
