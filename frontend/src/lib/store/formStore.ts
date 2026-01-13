@@ -230,32 +230,30 @@ export const useFormStore = create<FormStore>()(
           const { applicationId } = await response.json();
 
     // Notify GHL that application is submitted
-    if (process.env.NEXT_PUBLIC_GHL_WEBHOOK_URL) {
-      try {
-        await fetch(process.env.NEXT_PUBLIC_GHL_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            // Event info
-            event: 'application_submitted',
-            applicationId,
-            loanTypeId,
-            submittedAt: new Date().toISOString(),
-            
-            // Contact fields for GHL
-            firstName: responses['contact_first_name'] || responses['first_name'] || '',
-            lastName: responses['contact_last_name'] || responses['last_name'] || '',
-            email: responses['contact_email'] || responses['email'] || '',
-            phone: responses['contact_phone'] || responses['phone'] || '',
-            dateOfBirth: responses['date_of_birth'] || responses['dob'] || '',
-            contactSource: 'Trinity Finance Application',
-            contactType: 'Lead',
-          }),
-        });
-      } catch (webhookError) {
-        console.error('GHL notification failed:', webhookError);
-        // Don't fail submission if webhook fails
-      }
+    try {
+      await fetch('/api/ghl/application-submitted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          // Event info
+          event: 'application_submitted',
+          applicationId,
+          loanTypeId,
+          submittedAt: new Date().toISOString(),
+          
+          // Contact fields for GHL
+          firstName: responses['contact_first_name'] || responses['first_name'] || '',
+          lastName: responses['contact_last_name'] || responses['last_name'] || '',
+          email: responses['contact_email'] || responses['email'] || '',
+          phone: responses['contact_phone'] || responses['phone'] || '',
+          dateOfBirth: responses['date_of_birth'] || responses['dob'] || '',
+          contactSource: 'Trinity Finance Application',
+          contactType: 'Lead',
+        }),
+      });
+    } catch (webhookError) {
+      console.error('GHL notification failed:', webhookError);
+      // Don't fail submission if GHL sync fails
     }
     
     // Clear localStorage AND reset store state

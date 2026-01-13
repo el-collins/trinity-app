@@ -20,6 +20,12 @@ export const config = {
   goHighLevel: {
     apiKey: process.env.GHL_API_KEY || '',
     locationId: process.env.GHL_LOCATION_ID || '',
+    customFields: {
+      applicationId: process.env.GHL_FIELD_APPLICATION_ID || '',
+      applicationStatus: process.env.GHL_FIELD_APPLICATION_STATUS || '',
+      loanType: process.env.GHL_FIELD_LOAN_TYPE || '',
+      submissionDate: process.env.GHL_FIELD_SUBMISSION_DATE || '',
+    },
   },
   
   api: {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ghlService } from '@/lib/services/GHLService';
 
 /**
  * GHL Contact Sync API
@@ -26,58 +27,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const ghlWebhookUrl = process.env.NEXT_PUBLIC_GHL_WEBHOOK_URL;
-    
-    if (!ghlWebhookUrl) {
-      console.warn('GHL webhook URL not configured');
-      return NextResponse.json(
-        { success: false, message: 'GHL webhook not configured' },
-        { status: 200 }
-      );
-    }
-
     // Send to GHL
-    const response = await fetch(ghlWebhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        // Event info
-        event: 'contact_captured',
-        applicationId,
-        loanType,
-        capturedAt: new Date().toISOString(),
-        
-        // Contact data
-        firstName: firstName || '',
-        lastName: lastName || '',
-        email: email || '',
-        phone: phone || '',
-        
-        // Tags and source
-        tags: ['Application In Progress', loanType],
-        source: 'Trinity Finance SmartForm',
-        customFields: {
-          application_id: applicationId,
-          application_status: 'In Progress',
-          loan_type: loanType,
+    const contactId = await ghlService.createOrUpdateContact({
+      firstName,
+      lastName,
+      email,
+      phone,
+      tags: ['Application In Progress', loanType],
+      source: 'Trinity Finance SmartForm',
+      customFields: [
+        {
+            id: 'application_id_field_id_placeholder', // TODO: user needs to provide actual field IDs if mapped
+            key: 'application_id', 
+            field_value: applicationId
         },
-      }),
+        {
+            id: 'application_status_field_id_placeholder', // TODO: user needs to provide actual field IDs if mapped
+            key: 'application_status',
+            field_value: 'In Progress'
+        },
+        {
+            id: 'loan_type_field_id_placeholder', // TODO: user needs to provide actual field IDs if mapped
+            key: 'loan_type', 
+            field_value: loanType
+        }
+      ]
     });
 
-    if (!response.ok) {
-      console.error('GHL sync failed:', await response.text());
+    if (!contactId) {
+      console.error('GHL sync failed: No contact ID returned');
       return NextResponse.json(
         { success: false, message: 'GHL sync failed' },
         { status: 200 } // Don't fail the form, just log
       );
     }
-
-    const result = await response.json();
     
     return NextResponse.json({
       success: true,
       message: 'Contact synced to GHL',
-      ghlContactId: result.contactId,
+      ghlContactId: contactId,
     });
 
   } catch (error) {
