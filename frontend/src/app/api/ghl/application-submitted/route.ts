@@ -16,11 +16,23 @@ export async function POST(request: NextRequest) {
       email, 
       phone,
       dateOfBirth,
+      website,
+      city,
+      state,
+      postalCode,
       applicationId,
-      loanType,
+      loanTypeId: loanType,
       contactSource,
       submittedAt
     } = body;
+
+    // console.log('Received submission payload:', JSON.stringify(body, null, 2));
+
+    // Validate email presence
+    if (!email) {
+        console.warn('Missing email in submission payload');
+        // We might want to look for other common email fields in the body just in case the mapping failed upstream
+    }
 
     // Send to GHL
     const contactId = await ghlService.createOrUpdateContact({
@@ -29,6 +41,10 @@ export async function POST(request: NextRequest) {
       email,
       phone,
       dateOfBirth,
+      website,
+      city,
+      state,
+      postalCode,
       tags: ['Application Submitted', loanType],
       source: contactSource || 'Trinity Finance SmartForm',
       customFields: [

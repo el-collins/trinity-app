@@ -116,10 +116,10 @@ export const useFormStore = create<FormStore>()(
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  firstName: responses['first_name'] || responses['contact_first_name'] || '',
-                  lastName: responses['last_name'] || responses['contact_last_name'] || '',
-                  email: responses['email'] || responses['contact_email'] || responses['business_email'] || '',
-                  phone: responses['phone'] || responses['contact_phone'] || '',
+                  firstName: responses['first_name'] || '',
+                  lastName: responses['last_name'] || '',
+                  email: responses['email'] || responses['business_email'] || '',
+                  phone: responses['phone'] || responses['business_phone'] || '',
                   applicationId,
                   loanType: loanTypeId,
                 }),
@@ -176,6 +176,8 @@ export const useFormStore = create<FormStore>()(
         set({ isSubmitting: true });
         try {
           const { responses, loanTypeId, structure } = get();
+
+          console.log('Application response:', responses);
           
           if (!structure || !loanTypeId) {
             throw new Error('Form structure not loaded');
@@ -244,11 +246,14 @@ export const useFormStore = create<FormStore>()(
           // Contact fields for GHL
           firstName: responses['contact_first_name'] || responses['first_name'] || '',
           lastName: responses['contact_last_name'] || responses['last_name'] || '',
-          email: responses['contact_email'] || responses['email'] || '',
-          phone: responses['contact_phone'] || responses['phone'] || '',
-          dateOfBirth: responses['date_of_birth'] || responses['dob'] || '',
+          email: responses['business_email'] || responses['owner_email'] || '',
+          phone: responses['mobile_phone'] || responses['phone'] || '',
+          dateOfBirth: responses['owner_dob'] || responses['dob'] || '',
+          website: responses['website'] || responses['owner_website'] || '',
+          city: responses['city'] || responses['owner_city'] || '',
+          state: responses['state'] || responses['owner_state'] || '',
+          postalCode: responses['postal_code'] || responses['owner_postal_code'] || '',
           contactSource: 'Trinity Finance Application',
-          contactType: 'Lead',
         }),
       });
     } catch (webhookError) {
