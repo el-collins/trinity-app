@@ -1,0 +1,586 @@
+import nodemailer from 'nodemailer';
+import type { Transporter } from 'nodemailer';
+
+/**
+ * Email Service using Nodemailer with SMTP
+ * Sends application confirmation emails to applicants
+ */
+class EmailService {
+  private transporter: Transporter | null = null;
+
+  constructor() {
+    this.initializeTransporter();
+  }
+
+  /**
+   * Initialize nodemailer transporter with SMTP config
+   */
+  private initializeTransporter() {
+    try {
+      const {
+        EMAIL_HOST,
+        EMAIL_PORT,
+        EMAIL_SECURE,
+        EMAIL_USER,
+        EMAIL_PASSWORD,
+        EMAIL_FROM_NAME,
+      } = process.env;
+
+      // Validate required environment variables
+      if (!EMAIL_HOST || !EMAIL_USER || !EMAIL_PASSWORD) {
+        console.error('Email configuration missing. Email service disabled.');
+        return;
+      }
+
+      this.transporter = nodemailer.createTransport({
+        host: EMAIL_HOST,
+        port: parseInt(EMAIL_PORT || '465'),
+        secure: EMAIL_SECURE === 'true', // true for 465, false for other ports
+        auth: {
+          user: EMAIL_USER,
+          pass: EMAIL_PASSWORD,
+        },
+      });
+
+      console.log('Email service initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize email service:', error);
+      this.transporter = null;
+    }
+  }
+
+  /**
+   * Send application confirmation email to applicant
+   */
+  async sendApplicationConfirmation(
+    recipientEmail: string,
+    applicationData: {
+      applicationId: string;
+      loanType: string;
+      applicantName: string;
+      submittedAt: string;
+    }
+  ): Promise<boolean> {
+    if (!this.transporter) {
+      console.error('Email service not initialized. Cannot send email.');
+      return false;
+    }
+
+    try {
+      const { applicationId, loanType, applicantName, submittedAt } = applicationData;
+
+      const fromName = process.env.EMAIL_FROM_NAME || 'Trinity Finance';
+      const fromEmail = process.env.EMAIL_USER || 'noreply@financetrinity.com';
+
+      const mailOptions = {
+        from: `"${fromName}" <${fromEmail}>`,
+        to: recipientEmail,
+        subject: `Application Submitted - ${loanType} - Trinity Finance`,
+        html: this.getApplicationConfirmationHTML(applicationData),
+        text: this.getApplicationConfirmationText(applicationData),
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+
+      console.log('Confirmation email sent successfully:', {
+        messageId: info.messageId,
+        recipient: recipientEmail,
+        applicationId,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to send confirmation email:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Send notification to admin when new application is submitted
+   */
+  async sendAdminNotification(
+    applicationData: {
+      applicationId: string;
+      loanType: string;
+      applicantName: string;
+      applicantEmail: string;
+      applicantPhone?: string;
+      submittedAt: string;
+    }
+  ): Promise<boolean> {
+    if (!this.transporter) {
+      console.error('Email service not initialized. Cannot send email.');
+      return false;
+    }
+
+    try {
+      const fromName = process.env.EMAIL_FROM_NAME || 'Trinity Finance';
+      const fromEmail = process.env.EMAIL_USER || 'noreply@financetrinity.com';
+      const adminEmail = process.env.EMAIL_USER; // Send to same email for now
+
+      const mailOptions = {
+        from: `"${fromName}" <${fromEmail}>`,
+        to: adminEmail,
+        subject: `New Application Received - ${applicationData.loanType}`,
+        html: this.getAdminNotificationHTML(applicationData),
+        text: this.getAdminNotificationText(applicationData),
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+
+      console.log('Admin notification email sent successfully:', {
+        messageId: info.messageId,
+        applicationId: applicationData.applicationId,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to send admin notification email:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Generate HTML email template for application confirmation
+   */
+  private getApplicationConfirmationHTML(data: {
+    applicationId: string;
+    loanType: string;
+    applicantName: string;
+    submittedAt: string;
+  }): string {
+    const formattedDate = new Date(data.submittedAt).toLocaleString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Application Confirmation</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 0; text-align: center;">
+        <table role="presentation" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
+            </td>
+          </tr>
+
+          <!-- Success Icon -->
+          <tr>
+            <td style="padding: 30px 40px 20px; text-align: center;">
+              <div style="display: inline-block; width: 80px; height: 80px; background-color: #10b981; border-radius: 50%; position: relative;">
+                <span style="color: #ffffff; font-size: 48px; line-height: 80px;">✓</span>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 0 40px 30px;">
+              <h2 style="margin: 0 0 20px; color: #1f2937; font-size: 24px; text-align: center;">Application Submitted Successfully!</h2>
+
+              <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Dear ${data.applicantName || 'Applicant'},
+              </p>
+
+              <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Thank you for submitting your application with Trinity Finance. We have received your information and our team will review it shortly.
+              </p>
+
+              <!-- Application Details Box -->
+              <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f9fafb; border-radius: 6px; margin: 30px 0;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <h3 style="margin: 0 0 15px; color: #1f2937; font-size: 18px;">Application Details</h3>
+
+                    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                      <tr>
+                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Application ID:</td>
+                        <td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600; text-align: right;">${data.applicationId}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Loan Type:</td>
+                        <td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600; text-align: right;">${data.loanType}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Submitted:</td>
+                        <td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600; text-align: right;">${formattedDate}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Next Steps -->
+              <h3 style="margin: 30px 0 15px; color: #1f2937; font-size: 18px;">What's Next?</h3>
+
+              <ul style="margin: 0; padding: 0 0 0 20px; color: #4b5563; font-size: 15px; line-height: 1.8;">
+                <li style="margin: 0 0 10px;">Our team will review your application within 24-48 hours</li>
+                <li style="margin: 0 0 10px;">We may contact you if additional information is needed</li>
+                <li style="margin: 0 0 10px;">A loan specialist will reach out to discuss the next steps</li>
+              </ul>
+            </td>
+          </tr>
+
+          <!-- Contact Section -->
+          <tr>
+            <td style="padding: 30px 40px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px; color: #6b7280; font-size: 14px; text-align: center;">
+                Questions? Contact us at <a href="mailto:iq@financetrinity.com" style="color: #667eea; text-decoration: none;">iq@financetrinity.com</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 40px; text-align: center; background-color: #1f2937; border-radius: 0 0 8px 8px;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                © ${new Date().getFullYear()} Trinity Finance. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+  }
+
+  /**
+   * Generate plain text email for application confirmation
+   */
+  private getApplicationConfirmationText(data: {
+    applicationId: string;
+    loanType: string;
+    applicantName: string;
+    submittedAt: string;
+  }): string {
+    const formattedDate = new Date(data.submittedAt).toLocaleString();
+
+    return `
+TRINITY FINANCE - Application Confirmation
+
+Dear ${data.applicantName || 'Applicant'},
+
+Thank you for submitting your application with Trinity Finance. We have received your information and our team will review it shortly.
+
+APPLICATION DETAILS
+-------------------
+Application ID: ${data.applicationId}
+Loan Type: ${data.loanType}
+Submitted: ${formattedDate}
+
+WHAT'S NEXT?
+------------
+- Our team will review your application within 24-48 hours
+- We may contact you if additional information is needed
+- A loan specialist will reach out to discuss the next steps
+
+Questions? Contact us at iq@financetrinity.com
+
+© ${new Date().getFullYear()} Trinity Finance. All rights reserved.
+    `.trim();
+  }
+
+  /**
+   * Generate HTML email template for admin notification
+   */
+  private getAdminNotificationHTML(data: {
+    applicationId: string;
+    loanType: string;
+    applicantName: string;
+    applicantEmail: string;
+    applicantPhone?: string;
+    submittedAt: string;
+  }): string {
+    const formattedDate = new Date(data.submittedAt).toLocaleString();
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>New Application Notification</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+    <h2 style="color: #667eea;">New Application Received</h2>
+
+    <div style="background-color: #ffffff; padding: 20px; border-radius: 5px; margin-top: 20px;">
+      <h3>Application Details</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px; font-weight: bold;">Application ID:</td>
+          <td style="padding: 8px;">${data.applicationId}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; font-weight: bold;">Loan Type:</td>
+          <td style="padding: 8px;">${data.loanType}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; font-weight: bold;">Applicant Name:</td>
+          <td style="padding: 8px;">${data.applicantName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; font-weight: bold;">Email:</td>
+          <td style="padding: 8px;"><a href="mailto:${data.applicantEmail}">${data.applicantEmail}</a></td>
+        </tr>
+        ${data.applicantPhone ? `
+        <tr>
+          <td style="padding: 8px; font-weight: bold;">Phone:</td>
+          <td style="padding: 8px;">${data.applicantPhone}</td>
+        </tr>
+        ` : ''}
+        <tr>
+          <td style="padding: 8px; font-weight: bold;">Submitted:</td>
+          <td style="padding: 8px;">${formattedDate}</td>
+        </tr>
+      </table>
+    </div>
+
+    <p style="margin-top: 20px; color: #666;">
+      Please review this application in the admin dashboard.
+    </p>
+  </div>
+</body>
+</html>
+    `;
+  }
+
+  /**
+   * Generate plain text email for admin notification
+   */
+  private getAdminNotificationText(data: {
+    applicationId: string;
+    loanType: string;
+    applicantName: string;
+    applicantEmail: string;
+    applicantPhone?: string;
+    submittedAt: string;
+  }): string {
+    const formattedDate = new Date(data.submittedAt).toLocaleString();
+
+    return `
+NEW APPLICATION RECEIVED
+
+Application ID: ${data.applicationId}
+Loan Type: ${data.loanType}
+Applicant Name: ${data.applicantName}
+Email: ${data.applicantEmail}
+${data.applicantPhone ? `Phone: ${data.applicantPhone}\n` : ''}Submitted: ${formattedDate}
+
+Please review this application in the admin dashboard.
+    `.trim();
+  }
+
+  /**
+   * Send application invitation with pre-filled form link
+   * Used when GHL creates a new contact
+   */
+  async sendApplicationInvitation(
+    recipientEmail: string,
+    invitationData: {
+      applicantName: string;
+      loanType: string;
+      applicationUrl: string;
+    }
+  ): Promise<boolean> {
+    if (!this.transporter) {
+      console.error('Email service not initialized. Cannot send email.');
+      return false;
+    }
+
+    try {
+      const { applicantName, loanType, applicationUrl } = invitationData;
+
+      const fromName = process.env.EMAIL_FROM_NAME || 'Trinity Finance';
+      const fromEmail = process.env.EMAIL_USER || 'noreply@financetrinity.com';
+
+      const mailOptions = {
+        from: `"${fromName}" <${fromEmail}>`,
+        to: recipientEmail,
+        subject: `Complete Your ${loanType} Application - Trinity Finance`,
+        html: this.getApplicationInvitationHTML(invitationData),
+        text: this.getApplicationInvitationText(invitationData),
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+
+      console.log('Application invitation email sent successfully:', {
+        messageId: info.messageId,
+        recipient: recipientEmail,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to send application invitation email:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Generate HTML email template for application invitation
+   */
+  private getApplicationInvitationHTML(data: {
+    applicantName: string;
+    loanType: string;
+    applicationUrl: string;
+  }): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Complete Your Application</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 0; text-align: center;">
+        <table role="presentation" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 40px;">
+              <h2 style="margin: 0 0 20px; color: #1f2937; font-size: 24px; text-align: center;">Complete Your Loan Application</h2>
+
+              <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Dear ${data.applicantName},
+              </p>
+
+              <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Thank you for your interest in Trinity Finance! We've prepared a personalized application form for your <strong>${data.loanType}</strong> request.
+              </p>
+
+              <p style="margin: 0 0 30px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Your application has been pre-filled with your contact information to make the process quick and easy. Simply click the button below to get started.
+              </p>
+
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 40px 0;">
+                <a href="${data.applicationUrl}" style="display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                  Start My Application
+                </a>
+              </div>
+
+              <!-- Features -->
+              <div style="background-color: #f9fafb; border-radius: 6px; padding: 20px; margin: 30px 0;">
+                <h3 style="margin: 0 0 15px; color: #1f2937; font-size: 18px;">Why Choose Trinity Finance?</h3>
+                <ul style="margin: 0; padding: 0 0 0 20px; color: #4b5563; font-size: 15px; line-height: 1.8;">
+                  <li style="margin: 0 0 10px;">Fast approval process - get a decision in 24-48 hours</li>
+                  <li style="margin: 0 0 10px;">Competitive rates tailored to your business</li>
+                  <li style="margin: 0 0 10px;">Simple application - takes only 10-20 minutes</li>
+                  <li style="margin: 0 0 10px;">Dedicated loan specialist assigned to you</li>
+                </ul>
+              </div>
+
+              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                <strong>Note:</strong> Your progress is automatically saved. You can complete the application at your own pace and return to it anytime using the link above.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Contact Section -->
+          <tr>
+            <td style="padding: 30px 40px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px; color: #6b7280; font-size: 14px; text-align: center;">
+                Questions? Contact us at <a href="mailto:iq@financetrinity.com" style="color: #667eea; text-decoration: none;">iq@financetrinity.com</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 40px; text-align: center; background-color: #1f2937; border-radius: 0 0 8px 8px;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                © ${new Date().getFullYear()} Trinity Finance. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+  }
+
+  /**
+   * Generate plain text email for application invitation
+   */
+  private getApplicationInvitationText(data: {
+    applicantName: string;
+    loanType: string;
+    applicationUrl: string;
+  }): string {
+    return `
+TRINITY FINANCE - Complete Your Loan Application
+
+Dear ${data.applicantName},
+
+Thank you for your interest in Trinity Finance! We've prepared a personalized application form for your ${data.loanType} request.
+
+Your application has been pre-filled with your contact information to make the process quick and easy.
+
+COMPLETE YOUR APPLICATION:
+${data.applicationUrl}
+
+WHY CHOOSE TRINITY FINANCE?
+- Fast approval process - get a decision in 24-48 hours
+- Competitive rates tailored to your business
+- Simple application - takes only 10-20 minutes
+- Dedicated loan specialist assigned to you
+
+Note: Your progress is automatically saved. You can complete the application at your own pace and return to it anytime using the link above.
+
+Questions? Contact us at iq@financetrinity.com
+
+© ${new Date().getFullYear()} Trinity Finance. All rights reserved.
+    `.trim();
+  }
+
+  /**
+   * Verify email configuration is working
+   */
+  async verifyConnection(): Promise<boolean> {
+    if (!this.transporter) {
+      console.error('Email service not initialized');
+      return false;
+    }
+
+    try {
+      await this.transporter.verify();
+      console.log('Email service connection verified successfully');
+      return true;
+    } catch (error) {
+      console.error('Email service connection verification failed:', error);
+      return false;
+    }
+  }
+}
+
+// Singleton instance
+export const emailService = new EmailService();

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateFormSchema } from '@/lib/validation/schemaGenerator';
 import { neo4jConfigService } from '@/lib/services/Neo4jConfigService';
+import { emailService } from '@/lib/services/EmailService';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -62,6 +63,41 @@ export async function POST(request: NextRequest) {
     const applicationId = docRef.id;
 
     console.log('Application submitted to Firestore:', applicationId);
+
+    // Send confirmation email to applicant
+    try {
+      const applicantEmail = responses['business_email'] || responses['email'] || responses['contact_email'];
+      const applicantName = `${responses['first_name'] || responses['contact_first_name'] || ''} ${responses['last_name'] || responses['contact_last_name'] || ''}`.trim();
+      const applicantPhone = responses['business_phone'] || responses['phone'] || responses['mobile_phone'];
+
+      if (applicantEmail) {
+        // Send confirmation email to applicant
+        await emailService.sendApplicationConfirmation(applicantEmail, {
+          applicationId,
+          loanType: structure.loanType.name,
+          applicantName: applicantName || 'Applicant',
+          submittedAt: application.submittedAt,
+        });
+
+        // Send notification email to admin
+        await emailService.sendAdminNotification({
+          applicationId,
+          loanType: structure.loanType.name,
+          applicantName: applicantName || 'Unknown',
+          applicantEmail,
+          applicantPhone,
+          submittedAt: application.submittedAt,
+        });
+
+        console.log('Confirmation emails sent successfully');
+      } else {
+        console.warn('No email address found for applicant. Skipping email notification.');
+      }
+    } catch (emailError) {
+      // Log error but don't fail the application submission
+      console.error('Failed to send confirmation email:', emailError);
+      // Continue with successful response even if email fails
+    }
 
     return NextResponse.json({
       success: true,
