@@ -11,6 +11,7 @@ import MultiSelect from './fields/MultiSelect';
 import { validateField } from '@/lib/validation/schemaGenerator';
 import FileUpload from './fields/FileUpload';
 import { PhoneNumberInput } from '../ui/phone-input';
+import SignaturePad from './fields/SignaturePad';
 
 
 interface DynamicFieldProps {
@@ -20,10 +21,19 @@ interface DynamicFieldProps {
 export default function DynamicField({ field }: DynamicFieldProps) {
   const { responses, errors, setFieldValue, setFieldError } = useFormStore();
 
-  const value = responses[field.id] ?? '';
+  // Default value based on field type - boolean fields default to false, others to empty string
+  const defaultValue = field.type?.toLowerCase() === 'boolean' ? false : '';
+  const value = responses[field.id] ?? defaultValue;
   const error = errors[field.id];
 
   const handleChange = (newValue: any) => {
+    // Debug logging for signature fields
+    if (field.type?.toLowerCase() === 'signature') {
+      console.log(`[DynamicField] handleChange called for signature "${field.id}":`, {
+        newValue,
+        valueLength: typeof newValue === 'string' ? newValue.length : 'N/A'
+      });
+    }
     setFieldValue(field.id, newValue);
     // Clear error on change
     setFieldError(field.id, null);
@@ -45,19 +55,17 @@ export default function DynamicField({ field }: DynamicFieldProps) {
   }
 
   // Render appropriate field component based on type
-  const fieldType = field.type?.toUpperCase();
-  
+  // Support both uppercase (legacy) and lowercase (new convention) field types
+  const fieldType = field.type?.toLowerCase();
+
   switch (fieldType) {
-    case 'TEXT':
-    case 'EMAIL':
-    // case 'PHONE': // Moved below
-    // case 'TEL':   // Moved below
-    case 'SSN':
-    case 'EIN':
-    case 'ADDRESS':
-    case 'URL':
-    case 'TEXTAREA':
-    case 'SIGNATURE':   // Temporary: render as text input until SignaturePad is built
+    case 'text':
+    case 'email':
+    case 'ssn':
+    case 'ein':
+    case 'address':
+    case 'url':
+    case 'textarea':
       return (
         <TextInput
           field={field}
@@ -68,8 +76,19 @@ export default function DynamicField({ field }: DynamicFieldProps) {
         />
       );
 
-    case 'PHONE':
-    case 'TEL':
+    case 'signature':
+      return (
+        <SignaturePad
+          field={field}
+          value={value}
+          error={error}
+          onChange={handleChange}
+          onBlur={handleBlur}
+        />
+      );
+
+    case 'phone':
+    case 'tel':
       return (
          <div className="w-full">
             <label htmlFor={field.id} className="block text-sm font-medium text-gray-700 mb-2">
@@ -91,7 +110,7 @@ export default function DynamicField({ field }: DynamicFieldProps) {
          </div>
       );
 
-    case 'DATE':
+    case 'date':
       return (
         <DatePicker
           field={field}
@@ -101,9 +120,9 @@ export default function DynamicField({ field }: DynamicFieldProps) {
         />
       );
 
-    case 'NUMBER':
-    case 'CURRENCY':
-    case 'PERCENTAGE':
+    case 'number':
+    case 'currency':
+    case 'percentage':
       return (
         <NumberInput
           field={field}
@@ -113,7 +132,7 @@ export default function DynamicField({ field }: DynamicFieldProps) {
         />
       );
 
-    case 'SELECT':
+    case 'select':
       return (
         <SelectDropdown
           field={field}
@@ -123,7 +142,7 @@ export default function DynamicField({ field }: DynamicFieldProps) {
         />
       );
 
-    case 'MULTI_SELECT':
+    case 'multi_select':
       return (
         <MultiSelect
           field={field}
@@ -133,7 +152,7 @@ export default function DynamicField({ field }: DynamicFieldProps) {
         />
       );
 
-    case 'BOOLEAN':
+    case 'boolean':
       return (
         <BooleanToggle
           field={field}
@@ -143,7 +162,36 @@ export default function DynamicField({ field }: DynamicFieldProps) {
         />
       );
 
-    case 'FILE_UPLOAD':
+    case 'checkbox':
+      // Render checkbox field (for consent fields)
+      return (
+        <div className="w-full">
+          <label className="flex items-start space-x-3 cursor-pointer">
+            <input
+              type="checkbox"
+              id={field.id}
+              checked={value === true || value === 'true'}
+              onChange={(e) => handleChange(e.target.checked)}
+              onBlur={handleBlur}
+              className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <div className="flex-1">
+              <span className="text-sm font-medium text-gray-700">
+                {field.label}
+                {field.required && <span className="text-red-500 ml-1">*</span>}
+              </span>
+              {field.helpText && (
+                <p className="text-sm text-gray-500 mt-1">{field.helpText}</p>
+              )}
+            </div>
+          </label>
+          {error && (
+            <p className="mt-2 text-sm text-red-600">{error}</p>
+          )}
+        </div>
+      );
+
+    case 'file_upload':
       return (
         <FileUpload
           field={field}

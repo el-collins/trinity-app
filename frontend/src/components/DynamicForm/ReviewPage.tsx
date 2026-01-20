@@ -4,7 +4,7 @@ import { useFormStore } from '@/lib/store/formStore';
 import { useState } from 'react';
 
 interface ReviewPageProps {
-  onEdit?: () => void;
+  onEdit?: (sectionIndex: number) => void;
 }
 
 export default function ReviewPage({ onEdit }: ReviewPageProps) {
@@ -89,7 +89,7 @@ export default function ReviewPage({ onEdit }: ReviewPageProps) {
               <button
                 onClick={() => {
                   goToSection(index);
-                  onEdit?.();
+                  onEdit?.(index);
                 }}
                 className="ml-4 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors font-medium"
               >
@@ -114,9 +114,23 @@ export default function ReviewPage({ onEdit }: ReviewPageProps) {
                       {field.required && <span className="text-red-500 ml-1">*</span>}
                     </p>
                     {hasValue ? (
-                      <p className="text-gray-900">
-                        {Array.isArray(value) ? value.join(', ') : String(value)}
-                      </p>
+                      field.type?.toLowerCase() === 'signature' && typeof value === 'string' && value.startsWith('data:image') ? (
+                        <div className="mt-2">
+                          <img
+                            src={value}
+                            alt={field.label}
+                            className="max-h-32 border border-gray-200 rounded-lg bg-white p-2"
+                          />
+                        </div>
+                      ) : (
+                        <p className="text-gray-900">
+                          {field.type?.toLowerCase() === 'boolean'
+                            ? (value === true || value === 'true' || value === 'yes' ? 'Yes' : 'No')
+                            : Array.isArray(value)
+                              ? value.join(', ')
+                              : String(value)}
+                        </p>
+                      )
                     ) : (
                       <p className="text-gray-400 italic">Not answered</p>
                     )}
@@ -137,8 +151,9 @@ export default function ReviewPage({ onEdit }: ReviewPageProps) {
       <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
         <button
           onClick={() => {
-            goToSection(structure.sections.length - 1);
-            onEdit?.();
+            const lastSectionIndex = structure.sections.length - 1;
+            goToSection(lastSectionIndex);
+            onEdit?.(lastSectionIndex);
           }}
           className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
         >

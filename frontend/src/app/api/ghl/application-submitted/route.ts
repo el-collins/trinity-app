@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ghlService } from '@/lib/services/GHLService';
 import { config } from '@/lib/config';
+import { firestore } from '@/lib/firebase/admin';
+import { TokenService } from '@/lib/services/TokenService';
 
 /**
  * GHL Application Submitted API
@@ -10,10 +12,10 @@ import { config } from '@/lib/config';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { 
-      firstName, 
-      lastName, 
-      email, 
+    const {
+      firstName,
+      lastName,
+      email,
       phone,
       dateOfBirth,
       website,
@@ -23,7 +25,8 @@ export async function POST(request: NextRequest) {
       applicationId,
       loanTypeId: loanType,
       contactSource,
-      submittedAt
+      submittedAt,
+      applicationUrl
     } = body;
 
     // console.log('Received submission payload:', JSON.stringify(body, null, 2));
@@ -32,6 +35,31 @@ export async function POST(request: NextRequest) {
     if (!email) {
         console.warn('Missing email in submission payload');
         // We might want to look for other common email fields in the body just in case the mapping failed upstream
+    }
+
+    // Generate resume token and link for the submitted application
+    let resumeLink = applicationUrl;
+    if (!resumeLink && applicationId && email && loanType) {
+      try {
+        // Generate secure resume token
+        const resumeToken = TokenService.generateUploadToken(applicationId, email);
+
+        // Store token in resumeTokens collection
+        await firestore.collection('resumeTokens').doc(resumeToken).set({
+          applicationId,
+          email,
+          loanTypeId: loanType,
+          createdAt: new Date(),
+          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year for submitted apps
+          used: false,
+        });
+
+        resumeLink = `${config.api.baseUrl}/apply/${loanType}?resume=${resumeToken}`;
+      } catch (tokenError) {
+        console.error('Failed to generate resume token:', tokenError);
+        // Fallback to simple URL without resume capability
+        resumeLink = `${config.api.baseUrl}/apply/${loanType}`;
+      }
     }
 
     // Send to GHL
@@ -50,7 +78,7 @@ export async function POST(request: NextRequest) {
       customFields: [
         {
             id: config.goHighLevel.customFields.applicationId,
-            key: 'application_id', 
+            key: 'application_id',
             field_value: applicationId
         },
         {
@@ -60,8 +88,13 @@ export async function POST(request: NextRequest) {
         },
         {
             id: config.goHighLevel.customFields.loanType,
-            key: 'loan_type', 
+            key: 'loan_type',
             field_value: loanType
+        },
+        {
+            id: config.goHighLevel.customFields.applicationUrl,
+            key: 'application_url',
+            field_value: resumeLink
         },
         {
             id: config.goHighLevel.customFields.submissionDate,

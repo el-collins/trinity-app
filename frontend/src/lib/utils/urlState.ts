@@ -12,7 +12,10 @@ export interface ShareableFormState {
 
 /**
  * Encode form state to a URL-safe token
- * 
+ *
+ * DEPRECATED: This function is no longer used for URL-based state.
+ * Instead, use the database-backed save-progress API which stores state server-side.
+ *
  * Process:
  * 1. JSON stringify the state
  * 2. Compress using lz-string (URL-safe encoding)

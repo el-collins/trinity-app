@@ -4,18 +4,21 @@ import { useEffect, useState } from 'react';
 import { useFormStore } from '@/lib/store/formStore';
 import DynamicSection from './DynamicSection';
 import ReviewPage from './ReviewPage';
+import SaveAndExitModal from '../Modals/SaveAndExitModal';
 import { getResumeTokenFromURL } from '@/lib/utils/urlState';
 
 interface DynamicFormContainerProps {
   loanTypeId: string;
   applicationId?: string; // For resuming existing applications
   savedResponses?: Record<string, any>; // Pre-populated data
+  onComplete?: () => void; // Callback when form is completed (for Quick App flow)
 }
 
-export default function DynamicFormContainer({ 
-  loanTypeId, 
-  applicationId, 
-  savedResponses 
+export default function DynamicFormContainer({
+  loanTypeId,
+  applicationId,
+  savedResponses,
+  onComplete
 }: DynamicFormContainerProps) {
   const {
     structure,
@@ -31,17 +34,21 @@ export default function DynamicFormContainer({
     previousSection,
     goToSection,
     loadFromURL,
-    syncToURL,
-    resetForm, // Added resetForm
+    resetForm,
+    markSectionComplete,
   } = useFormStore();
 
   const [showReview, setShowReview] = useState(false);
   const [aiPlanning, setAiPlanning] = useState(false);
-  
-  // AI is always enabled based on env var (no UI toggle)
-  const aiEnabled = process.env.NEXT_PUBLIC_ENABLE_AI_PLANNING === 'true';
+  const [isFromQuickApp, setIsFromQuickApp] = useState(false);
+  const [returnToReview, setReturnToReview] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
 
-  // Fetch form structure on mount
+  // AI is always enabled based on env var (no UI toggle)
+  // But disable AI when coming from Quick App to prevent skipping unfilled sections
+  const aiEnabled = process.env.NEXT_PUBLIC_ENABLE_AI_PLANNING === 'true' && !isFromQuickApp;
+
+  // Fetch form structure on mount, then load resume token
   useEffect(() => {
     const fetchFormStructure = async () => {
       // Check for mismatch and reset BEFORE anything else
@@ -49,9 +56,17 @@ export default function DynamicFormContainer({
       const token = getResumeTokenFromURL();
 
       // If switching loan types without a resume token, clear everything immediately
-      if (!token && storedLoanTypeId && storedLoanTypeId !== loanTypeId) {
+      // EXCEPT when coming from quick_app to a full application (data reuse flow)
+      const isComingFromQuickApp = storedLoanTypeId === 'quick_app' && loanTypeId !== 'quick_app';
+
+      if (!token && storedLoanTypeId && storedLoanTypeId !== loanTypeId && !isComingFromQuickApp) {
         console.log('Loan type mismatch detected during init, resetting form...');
         resetForm();
+      } else if (isComingFromQuickApp) {
+        console.log('Coming from Quick App, preserving responses for data reuse');
+        setIsFromQuickApp(true);
+        // Reset section index to start from the beginning of the full application
+        goToSection(0);
       }
 
       setLoading(true);
@@ -61,7 +76,7 @@ export default function DynamicFormContainer({
           throw new Error('Failed to fetch form configuration');
         }
         const data = await response.json();
-        
+
         // Transform nested Neo4j response to flat structure
         const transformedData = {
           id: data.loanType.id,
@@ -70,9 +85,14 @@ export default function DynamicFormContainer({
           estimatedTime: data.loanType.estimatedTime,
           sections: data.sections
         };
-        
+
         setStructure(transformedData);
         setLoanTypeId(loanTypeId);
+
+        // AFTER structure is loaded, load resume token if present
+        if (token) {
+          await loadFromURL(token);
+        }
       } catch (error) {
         console.error('Error fetching form structure:', error);
       } finally {
@@ -81,24 +101,10 @@ export default function DynamicFormContainer({
     };
 
     fetchFormStructure();
-  }, [loanTypeId, setStructure, setLoanTypeId, setLoading]);
+  }, [loanTypeId, setStructure, setLoanTypeId, setLoading, loadFromURL]);
 
-  // Load from URL token on mount
-  useEffect(() => {
-    const token = getResumeTokenFromURL();
-    if (token) {
-      loadFromURL(token);
-    }
-  }, [loadFromURL]);
-
-  // Debounced URL sync on state changes
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      syncToURL();
-    }, 500); // 500ms debounce
-
-    return () => clearTimeout(timeoutId);
-  }, [responses, currentSectionIndex, completedSections, syncToURL]);
+  // URL sync is now disabled to avoid 431 errors
+  // State is persisted via localStorage and database-backed resume tokens
 
   // Watch for additional_owners_count changes and duplicate owner sections
   
@@ -202,15 +208,35 @@ export default function DynamicFormContainer({
 
   // Show review page if toggled
   if (showReview) {
-    return <ReviewPage onEdit={() => setShowReview(false)} />;
+    return <ReviewPage onEdit={(sectionIndex) => {
+      setShowReview(false);
+      setReturnToReview(true);
+      // goToSection is already called by ReviewPage
+    }} />;
   }
 
   const currentSection = structure.sections[currentSectionIndex];
+
+  // Safety check: ensure current section exists
+  if (!currentSection) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading section...</p>
+        </div>
+      </div>
+    );
+  }
+
   const isFirstSection = currentSectionIndex === 0;
   const isLastSection = currentSectionIndex === structure.sections.length - 1;
 
   // AI-powered navigation handler
   const handleNextSection = async () => {
+    // Mark current section as complete and sync to GHL if applicable
+    await markSectionComplete(currentSection.id);
+
     if (!aiEnabled || !structure) {
       // Fallback to normal navigation
       nextSection();
@@ -233,15 +259,13 @@ export default function DynamicFormContainer({
         }),
       }).then(r => r.json());
 
-      console.log('AI Decision:', decision);
-
       // Handle AI decision
       if (decision.action === 'skip_section') {
         // AI decided to skip to a specific section
         const nextSectionIndex = structure.sections.findIndex(
           s => s.id === decision.data.nextSectionId
         );
-        
+
         if (nextSectionIndex !== -1) {
           console.log(`AI skipping to section: ${decision.data.nextSectionId}`);
           console.log(`Reasoning: ${decision.reasoning}`);
@@ -268,8 +292,47 @@ export default function DynamicFormContainer({
     }
   };
 
+  // Handler for "Save & Return to Review" button
+  const handleReturnToReview = async () => {
+    // Mark current section as complete
+    await markSectionComplete(currentSection.id);
+    // Return to review page
+    setShowReview(true);
+    setReturnToReview(false);
+  };
+
+  // Handler for Save & Exit
+  const handleSaveAndExit = async (email: string): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/save-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          loanTypeId,
+          responses,
+          currentSectionIndex,
+          completedSections,
+        }),
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('Save & Exit failed:', error);
+      return false;
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
+      {/* Save & Exit Modal */}
+      <SaveAndExitModal
+        isOpen={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        onSave={handleSaveAndExit}
+        initialEmail={responses['business_email'] || responses['email'] || ''}
+      />
+
       {/* Header */}
       <div className="mb-8">
         <div className="flex justify-between items-start mb-2">
@@ -281,8 +344,17 @@ export default function DynamicFormContainer({
               Section {currentSectionIndex + 1} of {structure.sections.length}
             </p>
           </div>
-          
-          {/* AI Toggle Removed - Always Active via Env Var */}
+
+          {/* Save & Exit Button */}
+          <button
+            onClick={() => setShowSaveModal(true)}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            Save & Exit
+          </button>
         </div>
         
         {/* Progress Bar */}
@@ -314,7 +386,13 @@ export default function DynamicFormContainer({
         </button>
 
         <button
-          onClick={isLastSection ? () => setShowReview(true) : handleNextSection}
+          onClick={
+            returnToReview
+              ? handleReturnToReview
+              : isLastSection
+              ? (onComplete || (() => setShowReview(true)))
+              : handleNextSection
+          }
           disabled={aiPlanning}
           className="px-6 py-3 rounded-lg font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
@@ -325,9 +403,20 @@ export default function DynamicFormContainer({
             </>
           ) : (
             <>
-              {isLastSection ? 'Review Application' : 'Next'}
-              {aiEnabled && !isLastSection && (
-                <span className="text-xs opacity-75">✨ AI</span>
+              {returnToReview ? (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  Save & Return to Review
+                </>
+              ) : (
+                <>
+                  {isLastSection ? (onComplete ? 'Continue' : 'Review Application') : 'Next'}
+                  {aiEnabled && !isLastSection && (
+                    <span className="text-xs opacity-75">✨ AI</span>
+                  )}
+                </>
               )}
             </>
           )}

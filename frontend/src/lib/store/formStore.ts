@@ -49,7 +49,7 @@ interface FormActions {
   
   // URL State Management
   syncToURL: () => void;
-  loadFromURL: (token: string) => boolean;
+  loadFromURL: (token: string) => Promise<boolean>;
   
   // UI State
   setLoading: (loading: boolean) => void;
@@ -105,26 +105,31 @@ export const useFormStore = create<FormStore>()(
       
       markSectionComplete: async (sectionId) => {
         const { completedSections, responses, loanTypeId, applicationId } = get();
-        
+
         if (!completedSections.includes(sectionId)) {
           set({ completedSections: [...completedSections, sectionId] });
-          
-          // Sync contact to GHL when contact_info section is completed
-          if (sectionId === 'contact_info') {
+
+          // Sync contact to GHL when any contact section is completed
+          const isContactSection = ['quick_app_contact', 'contact_info', 'daily_contact'].includes(sectionId);
+
+          if (isContactSection) {
             try {
-              await fetch('/api/ghl/sync-contact', {
+              const response = await fetch('/api/ghl/sync-contact', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   firstName: responses['first_name'] || '',
                   lastName: responses['last_name'] || '',
                   email: responses['email'] || responses['business_email'] || '',
-                  phone: responses['phone'] || responses['business_phone'] || '',
+                  phone: responses['phone'] || responses['business_phone'] || responses['mobile_phone'] || '',
                   applicationId,
                   loanType: loanTypeId,
                 }),
               });
-              toast.success('Contact synced to GHL');
+
+              if (response.ok) {
+                toast.success('Contact synced to GHL');
+              }
             } catch (error) {
               console.error('GHL sync failed:', error);
               // Don't block form progress if GHL sync fails
@@ -135,6 +140,14 @@ export const useFormStore = create<FormStore>()(
       
       // Field Management
       setFieldValue: (fieldId, value) => {
+        // Debug logging for signature fields
+        if (fieldId.includes('signature')) {
+          console.log(`[FormStore] setFieldValue called:`, {
+            fieldId,
+            value,
+            valueLength: typeof value === 'string' ? value.length : 'N/A'
+          });
+        }
         set((state) => ({
           responses: { ...state.responses, [fieldId]: value },
           errors: { ...state.errors, [fieldId]: '' }, // Clear error on change
@@ -161,13 +174,25 @@ export const useFormStore = create<FormStore>()(
       validateCurrentSection: () => {
         const { structure, currentSectionIndex, responses } = get();
         if (!structure) return false;
-        
+
         const currentSection = structure.sections[currentSectionIndex];
-        
+
+        // Debug logging for signature fields in current section
+        const signatureFields = currentSection.fields.filter(f => f.type?.toLowerCase() === 'signature');
+        if (signatureFields.length > 0) {
+          console.log('[FormStore] Validating section, signature field values:',
+            signatureFields.map(f => ({
+              id: f.id,
+              valueInStore: responses[f.id],
+              valueLength: typeof responses[f.id] === 'string' ? responses[f.id].length : 'N/A'
+            }))
+          );
+        }
+
         // Use Zod validation
         const errors = validateSection(currentSection, responses);
         const isValid = Object.keys(errors).length === 0;
-        
+
         set({ errors, isValid });
         return isValid;
       },
@@ -260,6 +285,70 @@ export const useFormStore = create<FormStore>()(
       console.error('GHL notification failed:', webhookError);
       // Don't fail submission if GHL sync fails
     }
+
+    // Trigger document collection
+    try {
+      // Try multiple common field names for email
+      // prioritizing owner_email based on DB schema
+      const applicantEmail = responses['owner_email'] || 
+                            responses['business_email'] || 
+                            responses['email'] || 
+                            responses['contact_email'] || 
+                            '';
+      
+      console.log('Document collection trigger - Email found:', applicantEmail ? applicantEmail : 'NONE');
+
+      if (!applicantEmail) {
+        console.error('No email found in responses. Available keys:', Object.keys(responses));
+        // We can't proceed without an email
+        throw new Error('No applicant email found for document collection');
+      }
+
+      // Generate upload token
+      const tokenResponse = await fetch('/api/documents/generate-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationId,
+          email: applicantEmail,
+          loanTypeId,
+        }),
+      });
+
+      if (tokenResponse.ok) {
+        const { token } = await tokenResponse.json();
+        const uploadLink = `${window.location.origin}/documents/upload/${token}`;
+        
+        console.log('Generated upload token:', token);
+        console.log('Upload link:', uploadLink);
+
+        const emailResponse = await fetch('/api/documents/request-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: applicantEmail,
+            firstName: responses['contact_first_name'] || responses['first_name'] || 'Applicant',
+            loanType: structure.name,
+            uploadLink,
+          }),
+        });
+        
+        if (emailResponse.ok) {
+          console.log('Document collection email sent successfully');
+        } else {
+          console.error('Failed to send document email. Status:', emailResponse.status);
+          const errorData = await emailResponse.json();
+          console.error('Error detail:', errorData);
+        }
+      } else {
+        console.error('Failed to generate token. Status:', tokenResponse.status);
+        const errorData = await tokenResponse.json();
+        console.error('Token error:', errorData);
+      }
+    } catch (docError) {
+      console.error('Document collection setup failed:', docError);
+      // Don't fail submission if document collection fails
+    }
     
     // Clear localStorage AND reset store state
     localStorage.removeItem('trinity-form-storage');
@@ -277,41 +366,45 @@ export const useFormStore = create<FormStore>()(
       
       // URL State Management
       syncToURL: () => {
-        const { loanTypeId, responses, currentSectionIndex, completedSections } = get();
-        
-        if (!loanTypeId) return;
-        
-        try {
-          const state: ShareableFormState = {
-            loanTypeId,
-            responses,
-            currentSectionIndex,
-            completedSections,
-          };
-          
-          const token = encodeFormState(state);
-          updateURLWithToken(token, loanTypeId);
-        } catch (error) {
-          console.error('Failed to sync to URL:', error);
-        }
+        // DISABLED: We no longer sync state to URL to avoid 431 errors
+        // State is persisted via localStorage and database-backed resume tokens
+        // Users can use "Save & Exit" to get a secure resume link
+        return;
       },
-      
-      loadFromURL: (token: string) => {
+
+      loadFromURL: async (token: string) => {
         try {
-          const state = decodeFormState(token);
-          
-          if (!state) {
-            toast.error('Invalid or expired resume link');
+          // Load state from database-backed token
+          const response = await fetch(`/api/resume-application?token=${encodeURIComponent(token)}`);
+
+          if (!response.ok) {
+            const error = await response.json();
+            toast.error(error.error || 'Invalid or expired resume link');
             return false;
           }
-          
+
+          const state = await response.json();
+
+          if (!state || !state.loanTypeId) {
+            toast.error('Invalid resume link data');
+            return false;
+          }
+
+          // Validate section index to prevent out-of-bounds errors
+          const { structure } = get();
+          const maxSectionIndex = structure ? structure.sections.length - 1 : 0;
+          const validSectionIndex = Math.min(
+            Math.max(0, state.currentSectionIndex || 0),
+            maxSectionIndex
+          );
+
           set({
             loanTypeId: state.loanTypeId,
-            responses: state.responses,
-            currentSectionIndex: state.currentSectionIndex,
-            completedSections: state.completedSections,
+            responses: state.responses || {},
+            currentSectionIndex: validSectionIndex,
+            completedSections: state.completedSections || [],
           });
-          
+
           toast.success('Application resumed successfully');
           return true;
         } catch (error) {

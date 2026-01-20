@@ -89,6 +89,34 @@ function SuccessContent() {
         </div>
       </div>
 
+      {/* Affiliate Tracking (if applicable) */}
+      {application && (application.responses?.affiliate_company || application.responses?.affiliate_sub_agent) && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+          <h2 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
+            <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+            </svg>
+            Affiliate Information
+          </h2>
+          
+          <div className="space-y-3">
+            {application.responses.affiliate_company && (
+              <div className="flex justify-between">
+                <span className="text-blue-700 font-medium">Affiliate Company:</span>
+                <span className="text-blue-900 font-semibold">{application.responses.affiliate_company}</span>
+              </div>
+            )}
+            
+            {application.responses.affiliate_sub_agent && (
+              <div className="flex justify-between">
+                <span className="text-blue-700 font-medium">Sub-Agent:</span>
+                <span className="text-blue-900 font-semibold">{application.responses.affiliate_sub_agent}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Next Steps */}
       <div className="border-t border-gray-200 pt-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">What's Next?</h2>

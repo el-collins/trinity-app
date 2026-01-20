@@ -7,37 +7,62 @@ import { FormField, FormSection, LoanTypeDefinition } from '../types/schema';
 export function generateFieldSchema(field: FormField): z.ZodTypeAny {
   let schema: z.ZodTypeAny;
 
-  // Base schema based on field type
-  switch (field.type.toUpperCase()) {
-    case 'NUMBER':
-    case 'CURRENCY':
-    case 'PERCENTAGE':
+  // Base schema based on field type (support both uppercase and lowercase)
+  const fieldType = field.type.toLowerCase();
+
+  switch (fieldType) {
+    case 'number':
+    case 'currency':
+    case 'percentage':
       schema = z.coerce.number({ message: `${field.label} must be a number` });
       break;
-    
-    case 'EMAIL':
+
+    case 'email':
       schema = z.string().email(`Invalid email address`);
       break;
-    
-    case 'BOOLEAN':
-      // Accept both string and boolean values
-      schema = z.union([z.string(), z.boolean()]).transform(val => {
+
+    case 'boolean':
+      // Accept both string and boolean values - handle all common formats
+      schema = z.union([
+        z.string(),
+        z.boolean(),
+        z.literal(''),
+        z.undefined(),
+        z.null()
+      ]).transform(val => {
+        // Handle null, undefined, or empty string - default to false
+        if (val === null || val === undefined || val === '') return false;
+        // Handle boolean values directly
         if (typeof val === 'boolean') return val;
-        return val.toLowerCase() === 'true' || val.toLowerCase() === 'yes';
+        // Handle string representations
+        if (typeof val === 'string') {
+          const lower = val.toLowerCase();
+          return lower === 'true' || lower === 'yes';
+        }
+        // Default to false for any other case
+        return false;
       });
       break;
-    
-    case 'MULTI_SELECT':
+
+    case 'checkbox':
+      // Checkbox is similar to boolean but stricter for required consent fields
+      schema = z.union([z.boolean(), z.literal('true'), z.literal('false')]).transform(val => {
+        if (typeof val === 'boolean') return val;
+        return val === 'true' || val === true;
+      });
+      break;
+
+    case 'multi_select':
       schema = z.array(z.string());
       break;
-    
-    case 'DATE':
+
+    case 'date':
       schema = z.string().refine(
         (val) => !val || !isNaN(Date.parse(val)),
         { message: 'Invalid date format' }
       );
       break;
-    
+
     default:
       schema = z.string();
   }
@@ -46,19 +71,28 @@ export function generateFieldSchema(field: FormField): z.ZodTypeAny {
   if (Array.isArray(field.validation)) {
     field.validation.forEach((rule: string) => {
       if (rule === 'required') {
-        if (field.type.toUpperCase() === 'MULTI_SELECT') {
+        if (fieldType === 'multi_select') {
           schema = (schema as z.ZodArray<any>).min(1, `${field.label} is required`);
-        } else if (field.type.toUpperCase() === 'BOOLEAN') {
+        } else if (fieldType === 'boolean') {
           // Boolean fields are always "answered" since they default to false
           // No additional validation needed
+        } else if (fieldType === 'checkbox') {
+          // Checkbox fields need special handling - must be true for consent
+          // This is handled by the 'accepted' rule below
         } else {
           schema = (schema as z.ZodString).min(1, `${field.label} is required`);
         }
+      } else if (rule === 'accepted') {
+        // Special validation for checkboxes that must be checked (consent fields)
+        schema = z.union([z.boolean(), z.literal('true')]).refine(
+          val => val === true || val === 'true',
+          { message: 'You must accept to continue' }
+        );
       } else if (rule === 'email') {
         schema = z.string().email(`Invalid email address`);
       } else if (rule === 'phone') {
         schema = z.string().regex(
-          /^[\d\s\-\(\)]+$/,
+          /^[\+]?[\d\s\-\(\)]+$/,
           'Invalid phone number format'
         );
       } else if (rule === 'ssn') {
@@ -89,14 +123,14 @@ export function generateFieldSchema(field: FormField): z.ZodTypeAny {
           );
       } else if (rule.startsWith('min:')) {
         const min = parseInt(rule.split(':')[1]);
-        if (field.type.toUpperCase() === 'NUMBER' || field.type.toUpperCase() === 'CURRENCY') {
+        if (fieldType === 'number' || fieldType === 'currency') {
           schema = (schema as z.ZodNumber).min(min, `Must be at least ${min}`);
         } else {
           schema = (schema as z.ZodString).min(min, `Minimum ${min} characters`);
         }
       } else if (rule.startsWith('max:')) {
         const max = parseInt(rule.split(':')[1]);
-        if (field.type.toUpperCase() === 'NUMBER' || field.type.toUpperCase() === 'CURRENCY') {
+        if (fieldType === 'number' || fieldType === 'currency') {
           schema = (schema as z.ZodNumber).max(max, `Must be at most ${max}`);
         } else {
           schema = (schema as z.ZodString).max(max, `Maximum ${max} characters`);
@@ -185,10 +219,22 @@ export function validateField(field: FormField, value: any): string | null {
     const schema = generateFieldSchema(field);
     // Normalize undefined/null to empty string for optional fields
     const normalizedValue = (value === undefined || value === null) ? '' : value;
+
+    // Debug logging for signature fields
+    if (field.type?.toLowerCase() === 'signature') {
+      console.log(`[Validation] Signature field "${field.id}":`, {
+        rawValue: value,
+        normalizedValue,
+        valueLength: typeof normalizedValue === 'string' ? normalizedValue.length : 'N/A',
+        required: field.required
+      });
+    }
+
     schema.parse(normalizedValue);
     return null;
   } catch (error) {
     if (error instanceof z.ZodError) {
+      console.error(`[Validation] Field "${field.id}" failed:`, error.issues[0]?.message);
       return error.issues[0]?.message || 'Invalid value';
     }
     return 'Validation error';

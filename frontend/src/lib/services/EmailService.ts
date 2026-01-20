@@ -116,7 +116,8 @@ class EmailService {
     try {
       const fromName = process.env.EMAIL_FROM_NAME || 'Trinity Finance';
       const fromEmail = process.env.EMAIL_USER || 'noreply@financetrinity.com';
-      const adminEmail = process.env.EMAIL_USER; // Send to same email for now
+      const adminEmail = 'ccollins@hordanso.com' 
+      // || process.env.EMAIL_USER; // Send to same email for now
 
       const mailOptions = {
         from: `"${fromName}" <${fromEmail}>`,
@@ -560,6 +561,294 @@ Questions? Contact us at iq@financetrinity.com
 
 © ${new Date().getFullYear()} Trinity Finance. All rights reserved.
     `.trim();
+  }
+
+  /**
+   * Send document request email with upload link
+   * Used after application submission to request required documents
+   */
+  async sendDocumentRequestEmail(data: {
+    to: string;
+    firstName: string;
+    loanType: string;
+    uploadLink: string;
+    requiredDocuments?: string[];
+  }): Promise<boolean> {
+    if (!this.transporter) {
+      console.error('Email service not initialized. Cannot send email.');
+      return false;
+    }
+
+    try {
+      const fromName = process.env.EMAIL_FROM_NAME || 'Trinity Finance';
+      const fromEmail = process.env.EMAIL_USER || 'noreply@financetrinity.com';
+
+      const mailOptions = {
+        from: `"${fromName}" <${fromEmail}>`,
+        to: data.to,
+        subject: `Document Upload Required - ${data.loanType} Application`,
+        html: this.getDocumentRequestHTML(data),
+        text: this.getDocumentRequestText(data),
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+
+      console.log('Document request email sent successfully:', {
+        messageId: info.messageId,
+        recipient: data.to,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to send document request email:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Generate HTML email template for document request
+   */
+  private getDocumentRequestHTML(data: {
+    firstName: string;
+    loanType: string;
+    uploadLink: string;
+    requiredDocuments?: string[];
+  }): string {
+    const documentsList = data.requiredDocuments && data.requiredDocuments.length > 0
+      ? data.requiredDocuments.map(doc => `<li style="margin: 0 0 8px;">${doc}</li>`).join('')
+      : '<li style="margin: 0 0 8px;">Driver\'s License (front and back)</li><li style="margin: 0 0 8px;">Bank Statements</li><li style="margin: 0 0 8px;">Tax Returns</li>';
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document Upload Required</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 0; text-align: center;">
+        <table role="presentation" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 40px;">
+              <h2 style="margin: 0 0 20px; color: #1f2937; font-size: 24px; text-align: center;">Document Upload Required</h2>
+
+              <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Dear ${data.firstName},
+              </p>
+
+              <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Thank you for submitting your ${data.loanType} application! To continue processing your application, we need you to upload the following documents:
+              </p>
+
+              <!-- Documents List -->
+              <div style="background-color: #f9fafb; border-radius: 6px; padding: 20px; margin: 30px 0;">
+                <h3 style="margin: 0 0 15px; color: #1f2937; font-size: 18px;">Required Documents</h3>
+                <ul style="margin: 0; padding: 0 0 0 20px; color: #4b5563; font-size: 15px; line-height: 1.8;">
+                  ${documentsList}
+                </ul>
+              </div>
+
+              <p style="margin: 0 0 30px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Please use the secure upload link below to submit your documents. This link will expire in 7 days.
+              </p>
+
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 40px 0;">
+                <a href="${data.uploadLink}" style="display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                  Upload Documents
+                </a>
+              </div>
+
+              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                <strong>Note:</strong> All uploads are secure and encrypted. You can upload documents one at a time or all at once.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Contact Section -->
+          <tr>
+            <td style="padding: 30px 40px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px; color: #6b7280; font-size: 14px; text-align: center;">
+                Questions? Contact us at <a href="mailto:iq@financetrinity.com" style="color: #667eea; text-decoration: none;">iq@financetrinity.com</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 40px; text-align: center; background-color: #1f2937; border-radius: 0 0 8px 8px;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                © ${new Date().getFullYear()} Trinity Finance. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+  }
+
+  /**
+   * Generate plain text email for document request
+   */
+  private getDocumentRequestText(data: {
+    firstName: string;
+    loanType: string;
+    uploadLink: string;
+    requiredDocuments?: string[];
+  }): string {
+    const documentsList = data.requiredDocuments && data.requiredDocuments.length > 0
+      ? data.requiredDocuments.map(doc => `- ${doc}`).join('\n')
+      : '- Driver\'s License (front and back)\n- Bank Statements\n- Tax Returns';
+
+    return `
+TRINITY FINANCE - Document Upload Required
+
+Dear ${data.firstName},
+
+Thank you for submitting your ${data.loanType} application! To continue processing your application, we need you to upload the following documents:
+
+REQUIRED DOCUMENTS
+------------------
+${documentsList}
+
+UPLOAD YOUR DOCUMENTS
+---------------------
+${data.uploadLink}
+
+This secure upload link will expire in 7 days.
+
+Note: All uploads are secure and encrypted. You can upload documents one at a time or all at once.
+
+Questions? Contact us at iq@financetrinity.com
+
+© ${new Date().getFullYear()} Trinity Finance. All rights reserved.
+    `.trim();
+  }
+
+  /**
+   * Send resume link email
+   */
+  async sendResumeLink(
+    recipientEmail: string,
+    data: {
+      firstName: string;
+      loanType: string;
+      resumeLink: string;
+    }
+  ): Promise<boolean> {
+    if (!this.transporter) {
+      console.error('Email service not initialized. Cannot send email.');
+      return false;
+    }
+
+    try {
+      const fromName = process.env.EMAIL_FROM_NAME || 'Trinity Finance';
+      const fromEmail = process.env.EMAIL_USER || 'noreply@financetrinity.com';
+
+      const mailOptions = {
+        from: `"${fromName}" <${fromEmail}>`,
+        to: recipientEmail,
+        subject: `Resume Your Application - ${data.loanType} - Trinity Finance`,
+        html: this.getResumeLinkHTML(data),
+        text: this.getResumeLinkText(data),
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log('Resume link email sent successfully:', {
+        messageId: info.messageId,
+        recipient: recipientEmail,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to send resume link email:', error);
+      return false;
+    }
+  }
+
+  private getResumeLinkHTML(data: { firstName: string; loanType: string; resumeLink: string }): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Resume Your Application</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 0; text-align: center;">
+        <table role="presentation" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px;">
+              <h2 style="margin: 0 0 20px; color: #1f2937; font-size: 24px; text-align: center;">Resume Your Application</h2>
+              <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Dear ${data.firstName},
+              </p>
+              <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                We saved your progress for the <strong>${data.loanType}</strong> application. You can pick up exactly where you left off by clicking the button below.
+              </p>
+              <div style="text-align: center; margin: 40px 0;">
+                <a href="${data.resumeLink}" style="display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                  Resume Application
+                </a>
+              </div>
+              <p style="margin: 0 0 20px; color: #4b5563; font-size: 14px;">
+                Alternatively, copy and paste this link into your browser:<br>
+                <a href="${data.resumeLink}" style="color: #667eea; word-break: break-all;">${data.resumeLink}</a>
+              </p>
+              <p style="margin: 20px 0 0; color: #6b7280; font-size: 14px; text-align: center;">
+                This link will expire in 30 days.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 40px; text-align: center; background-color: #1f2937; border-radius: 0 0 8px 8px;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">© ${new Date().getFullYear()} Trinity Finance</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+  }
+
+  private getResumeLinkText(data: { firstName: string; loanType: string; resumeLink: string }): string {
+    return `
+TRINITY FINANCE - Resume Your Application
+
+Dear ${data.firstName},
+
+We saved your progress for the ${data.loanType} application. You can pick up exactly where you left off by using the link below:
+
+${data.resumeLink}
+
+This link will expire in 30 days.
+
+© ${new Date().getFullYear()} Trinity Finance
+`.trim();
   }
 
   /**

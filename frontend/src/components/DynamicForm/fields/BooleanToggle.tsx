@@ -12,7 +12,7 @@ interface BooleanToggleProps {
 
 export default function BooleanToggle({ field, value, error, onChange }: BooleanToggleProps) {
   // Convert string values to boolean
-  const boolValue = typeof value === 'string' 
+  const boolValue = typeof value === 'string'
     ? value.toLowerCase() === 'true' || value.toLowerCase() === 'yes'
     : !!value;
 
@@ -23,6 +23,7 @@ export default function BooleanToggle({ field, value, error, onChange }: Boolean
       onChange(false);
     }
   }, []); // Only run on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
 
   const handleChange = (newValue: boolean) => {
     onChange(newValue);
