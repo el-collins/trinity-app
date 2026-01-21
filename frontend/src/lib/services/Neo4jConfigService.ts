@@ -142,6 +142,7 @@ class Neo4jConfigService {
       // Define section order and labels
       const sectionOrder: Record<string, { order: number; label: string; description?: string }> = {
         'contact': { order: 1, label: 'Contact Information', description: 'Your contact details' },
+        'contact_info': { order: 1, label: 'Contact Information', description: 'Your contact details' },
         'quick_app_contact': { order: 1, label: 'Contact Information', description: 'Your contact details' },
         'quick_app_business': { order: 2, label: 'Business Information', description: 'Tell us about your business' },
         'quick_app_financial': { order: 3, label: 'Financial Qualification', description: 'Financial details to help us find the right loan' },

@@ -113,26 +113,35 @@ export const useFormStore = create<FormStore>()(
           const isContactSection = ['quick_app_contact', 'contact_info', 'daily_contact'].includes(sectionId);
 
           if (isContactSection) {
-            try {
-              const response = await fetch('/api/ghl/sync-contact', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  firstName: responses['first_name'] || '',
-                  lastName: responses['last_name'] || '',
-                  email: responses['email'] || responses['business_email'] || '',
-                  phone: responses['phone'] || responses['business_phone'] || responses['mobile_phone'] || '',
-                  applicationId,
-                  loanType: loanTypeId,
-                }),
-              });
+            // Get contact data from responses
+            const email = responses['email'] || responses['business_email'] || '';
+            const phone = responses['phone'] || responses['business_phone'] || responses['mobile_phone'] || '';
 
-              if (response.ok) {
-                toast.success('Contact synced to GHL');
+            // Only sync if we have at least email or phone
+            if (email || phone) {
+              try {
+                const response = await fetch('/api/ghl/sync-contact', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    firstName: responses['first_name'] || '',
+                    lastName: responses['last_name'] || '',
+                    email,
+                    phone,
+                    applicationId,
+                    loanType: loanTypeId,
+                  }),
+                });
+
+                if (response.ok) {
+                  toast.success('Contact synced to GHL');
+                }
+              } catch (error) {
+                console.error('GHL sync failed:', error);
+                // Don't block form progress if GHL sync fails
               }
-            } catch (error) {
-              console.error('GHL sync failed:', error);
-              // Don't block form progress if GHL sync fails
+            } else {
+              console.log('Skipping GHL sync - no email or phone provided yet');
             }
           }
         }
