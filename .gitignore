@@ -4,6 +4,7 @@ firestore.rules
 # Scripts & Documentation
 Cypher scripts/
 docs/
+TEST/
 
 # System Files
 .DS_Store

@@ -3,7 +3,7 @@ import { generateFormSchema } from '@/lib/validation/schemaGenerator';
 import { neo4jConfigService } from '@/lib/services/Neo4jConfigService';
 import { emailService } from '@/lib/services/EmailService';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,7 +48,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create application object
+    // Check for existing applications from same email to preserve history
+    const applicantEmail = responses['business_email'] || responses['email'] || responses['contact_email'];
+    let previousApplications: { id: string; submittedAt: string }[] = [];
+    let applicationVersion = 1;
+
+    if (applicantEmail) {
+      try {
+        // Query for previous applications with same email
+        const previousAppsQuery = query(
+          collection(db, 'applications'),
+          where('applicantEmail', '==', applicantEmail)
+        );
+        const previousAppsSnapshot = await getDocs(previousAppsQuery);
+
+        if (!previousAppsSnapshot.empty) {
+          previousApplications = previousAppsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            submittedAt: doc.data().submittedAt,
+          }));
+          applicationVersion = previousApplications.length + 1;
+          console.log(`Found ${previousApplications.length} previous application(s) for ${applicantEmail}`);
+        }
+      } catch (queryError) {
+        console.error('Error querying previous applications:', queryError);
+        // Continue with new application even if query fails
+      }
+    }
+
+    // Create application object with version tracking
     const application = {
       loanTypeId,
       responses,
@@ -56,9 +84,21 @@ export async function POST(request: NextRequest) {
       submittedAt: submittedAt || new Date().toISOString(),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+      // Data versioning fields
+      applicantEmail: applicantEmail || null,
+      version: applicationVersion,
+      previousApplicationIds: previousApplications.map(app => app.id),
+      // Preserve initial interaction data
+      initialInteraction: {
+        firstContactDate: previousApplications.length > 0
+          ? previousApplications[0].submittedAt
+          : (submittedAt || new Date().toISOString()),
+        totalApplications: applicationVersion,
+        loanTypesApplied: [loanTypeId],
+      },
     };
 
-    // Save to Firestore
+    // Save to Firestore (creates new document, doesn't override)
     const docRef = await addDoc(collection(db, 'applications'), application);
     const applicationId = docRef.id;
 
@@ -66,7 +106,6 @@ export async function POST(request: NextRequest) {
 
     // Send confirmation email to applicant
     try {
-      const applicantEmail = responses['business_email'] || responses['email'] || responses['contact_email'];
       const applicantName = `${responses['first_name'] || responses['contact_first_name'] || ''} ${responses['last_name'] || responses['contact_last_name'] || ''}`.trim();
       const applicantPhone = responses['business_phone'] || responses['phone'] || responses['mobile_phone'];
 

@@ -191,6 +191,42 @@ export default function DynamicField({ field }: DynamicFieldProps) {
         </div>
       );
 
+    case 'radio':
+      // Render radio button group
+      return (
+        <div className="w-full">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            {field.label}
+            {field.required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+          {field.helpText && (
+            <p className="text-sm text-gray-500 mb-3">{field.helpText}</p>
+          )}
+          <div className="space-y-2">
+            {field.options?.map((option) => (
+              <label
+                key={option}
+                className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                <input
+                  type="radio"
+                  name={field.id}
+                  value={option}
+                  checked={value === option}
+                  onChange={(e) => handleChange(e.target.value)}
+                  onBlur={handleBlur}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <span className="text-sm text-gray-700">{option}</span>
+              </label>
+            ))}
+          </div>
+          {error && (
+            <p className="mt-2 text-sm text-red-600">{error}</p>
+          )}
+        </div>
+      );
+
     case 'file_upload':
       return (
         <FileUpload

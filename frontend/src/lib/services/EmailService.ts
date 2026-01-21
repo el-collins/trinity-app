@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import { config } from '../config';
 
 /**
  * Email Service using Nodemailer with SMTP
@@ -96,7 +97,8 @@ class EmailService {
   }
 
   /**
-   * Send notification to admin when new application is submitted
+   * Send notification to team when new application is submitted
+   * Uses configurable team emails from config
    */
   async sendAdminNotification(
     applicationData: {
@@ -113,15 +115,21 @@ class EmailService {
       return false;
     }
 
+    // Check if notifications are enabled
+    if (!config.notifications.onApplicationSubmitted) {
+      console.log('Application submission notifications are disabled');
+      return true;
+    }
+
     try {
       const fromName = process.env.EMAIL_FROM_NAME || 'Trinity Finance';
       const fromEmail = process.env.EMAIL_USER || 'noreply@financetrinity.com';
-      const adminEmail = 'ccollins@hordanso.com' 
-      // || process.env.EMAIL_USER; // Send to same email for now
+      // Use configurable team emails
+      const teamEmails = config.notifications.teamEmails;
 
       const mailOptions = {
         from: `"${fromName}" <${fromEmail}>`,
-        to: adminEmail,
+        to: teamEmails.join(', '),
         subject: `New Application Received - ${applicationData.loanType}`,
         html: this.getAdminNotificationHTML(applicationData),
         text: this.getAdminNotificationText(applicationData),
@@ -129,16 +137,158 @@ class EmailService {
 
       const info = await this.transporter.sendMail(mailOptions);
 
-      console.log('Admin notification email sent successfully:', {
+      console.log('Team notification email sent successfully:', {
         messageId: info.messageId,
         applicationId: applicationData.applicationId,
+        recipients: teamEmails,
       });
 
       return true;
     } catch (error) {
-      console.error('Failed to send admin notification email:', error);
+      console.error('Failed to send team notification email:', error);
       return false;
     }
+  }
+
+  /**
+   * Send notification to team when documents are uploaded
+   */
+  async sendDocumentUploadNotification(
+    data: {
+      applicationId: string;
+      applicantEmail: string;
+      applicantName?: string;
+      documentName: string;
+      documentUrl: string;
+      uploadedAt: string;
+    }
+  ): Promise<boolean> {
+    if (!this.transporter) {
+      console.error('Email service not initialized. Cannot send email.');
+      return false;
+    }
+
+    // Check if notifications are enabled
+    if (!config.notifications.onDocumentsUploaded) {
+      console.log('Document upload notifications are disabled');
+      return true;
+    }
+
+    try {
+      const fromName = process.env.EMAIL_FROM_NAME || 'Trinity Finance';
+      const fromEmail = process.env.EMAIL_USER || 'noreply@financetrinity.com';
+      const teamEmails = config.notifications.teamEmails;
+
+      const mailOptions = {
+        from: `"${fromName}" <${fromEmail}>`,
+        to: teamEmails.join(', '),
+        subject: `Document Uploaded - ${data.documentName}`,
+        html: this.getDocumentUploadNotificationHTML(data),
+        text: this.getDocumentUploadNotificationText(data),
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+
+      console.log('Document upload notification sent:', {
+        messageId: info.messageId,
+        applicationId: data.applicationId,
+        document: data.documentName,
+        recipients: teamEmails,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to send document upload notification:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Generate HTML email for document upload notification
+   */
+  private getDocumentUploadNotificationHTML(data: {
+    applicationId: string;
+    applicantEmail: string;
+    applicantName?: string;
+    documentName: string;
+    documentUrl: string;
+    uploadedAt: string;
+  }): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Document Uploaded</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">Document Uploaded</h1>
+        </div>
+
+        <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px; margin-bottom: 20px;">A new document has been uploaded:</p>
+
+          <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 20px;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6;"><strong>Document:</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6;">${data.documentName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6;"><strong>Application ID:</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6;">${data.applicationId}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6;"><strong>Applicant:</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #f3f4f6;">${data.applicantName || data.applicantEmail}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0;"><strong>Uploaded At:</strong></td>
+                <td style="padding: 10px 0;">${new Date(data.uploadedAt).toLocaleString()}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="text-align: center;">
+            <a href="${data.documentUrl}" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Document</a>
+          </div>
+        </div>
+
+        <div style="text-align: center; padding: 20px; color: #6b7280; font-size: 12px;">
+          <p>This is an automated notification from Trinity Finance SmartForm</p>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Generate plain text email for document upload notification
+   */
+  private getDocumentUploadNotificationText(data: {
+    applicationId: string;
+    applicantEmail: string;
+    applicantName?: string;
+    documentName: string;
+    documentUrl: string;
+    uploadedAt: string;
+  }): string {
+    return `
+Document Uploaded - Trinity Finance
+
+A new document has been uploaded:
+
+Document: ${data.documentName}
+Application ID: ${data.applicationId}
+Applicant: ${data.applicantName || data.applicantEmail}
+Uploaded At: ${new Date(data.uploadedAt).toLocaleString()}
+
+View Document: ${data.documentUrl}
+
+---
+This is an automated notification from Trinity Finance SmartForm
+    `.trim();
   }
 
   /**

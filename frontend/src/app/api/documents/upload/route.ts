@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TokenService } from '@/lib/services/TokenService';
 import { storage, firestore } from '@/lib/firebase/admin';
 import { ghlService } from '@/lib/services/GHLService';
+import { emailService } from '@/lib/services/EmailService';
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -47,23 +48,46 @@ export async function POST(request: NextRequest) {
         }
       }
     }, { merge: true });
-    // Sync to GHL
+    // Sync to GHL with document URL and "Documents Uploaded" tag
     const ghlFieldId = getGHLFieldId(documentId);
+    const documentLabel = getDocumentLabel(documentId);
     console.log(`[Document Upload] Syncing to GHL - Document ID: ${documentId}, Field ID: ${ghlFieldId}, Email: ${decoded.email}`);
 
-    if (ghlFieldId) {
-      try {
-        const contactId = await ghlService.createOrUpdateContact({
-          email: decoded.email,
-          customFields: [{ id: ghlFieldId, field_value: publicUrl }],
-        });
-        console.log(`[Document Upload] Successfully synced to GHL contact: ${contactId}`);
-      } catch (ghlError: any) {
-        console.error(`[Document Upload] GHL sync failed:`, ghlError.response?.data || ghlError.message);
-        // Don't fail the upload if GHL sync fails - log and continue
+    try {
+      // Build update payload with tags for document tracking
+      const ghlPayload: {
+        email: string;
+        tags: string[];
+        customFields?: { id: string; field_value: string }[];
+      } = {
+        email: decoded.email,
+        tags: ['Documents Uploaded', `Doc: ${documentLabel}`],
+      };
+
+      // Add custom field if mapping exists
+      if (ghlFieldId) {
+        ghlPayload.customFields = [{ id: ghlFieldId, field_value: publicUrl }];
       }
-    } else {
-      console.warn(`[Document Upload] No GHL field mapping found for document ID: ${documentId}`);
+
+      const contactId = await ghlService.createOrUpdateContact(ghlPayload);
+      console.log(`[Document Upload] Successfully synced to GHL contact: ${contactId} with tags: ${ghlPayload.tags.join(', ')}`);
+    } catch (ghlError: any) {
+      console.error(`[Document Upload] GHL sync failed:`, ghlError.response?.data || ghlError.message);
+      // Don't fail the upload if GHL sync fails - log and continue
+    }
+
+    // Send team notification about document upload
+    try {
+      await emailService.sendDocumentUploadNotification({
+        applicationId,
+        applicantEmail: decoded.email,
+        documentName: documentLabel,
+        documentUrl: publicUrl,
+        uploadedAt: new Date().toISOString(),
+      });
+    } catch (notifyError) {
+      console.error('[Document Upload] Team notification failed:', notifyError);
+      // Don't fail the upload if notification fails
     }
 
     return NextResponse.json({ success: true, url: publicUrl });
@@ -117,4 +141,49 @@ function getGHLFieldId(documentId: string): string | null {
   };
   
   return fieldMap[documentId] || null;
+}
+
+// Get human-readable label for document type (for GHL tags)
+function getDocumentLabel(documentId: string): string {
+  const labelMap: Record<string, string> = {
+    // Identity Documents
+    drivers_license_front: "Driver's License Front",
+    drivers_license_back: "Driver's License Back",
+
+    // Bank Statements
+    bank_statement_ytd: 'Bank Statement YTD',
+    bank_statement_month_1: 'Bank Statement Month 1',
+    bank_statement_month_2: 'Bank Statement Month 2',
+    bank_statement_month_3: 'Bank Statement Month 3',
+    bank_statement_month_4: 'Bank Statement Month 4',
+
+    // Tax Returns
+    tax_return_current: 'Tax Return Current',
+    tax_return_last_year: 'Tax Return Last Year',
+    tax_return_two_years_ago: 'Tax Return 2 Years Ago',
+
+    // Banking
+    voided_check: 'Voided Check',
+
+    // Workbooks
+    debt_schedule_upload: 'Debt Schedule',
+    equipment_finance_workbook_upload: 'Equipment Finance Workbook',
+    ar_aging_report_upload: 'AR Aging Report',
+
+    // Financial Statements
+    ytd_profit_loss: 'YTD Profit & Loss',
+    ytd_financial_statements: 'YTD Financial Statements',
+    two_year_financials: '2 Year Financials',
+
+    // Invoice Documents
+    sample_invoices: 'Sample Invoices',
+    customer_list: 'Customer List',
+    ap_aging_report: 'AP Aging Report',
+    billing_process: 'Billing Process',
+    company_background: 'Company Background',
+    owner_management_bio: 'Owner/Management Bio',
+    personal_financial_statement: 'Personal Financial Statement',
+  };
+
+  return labelMap[documentId] || documentId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }

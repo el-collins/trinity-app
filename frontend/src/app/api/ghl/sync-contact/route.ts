@@ -27,13 +27,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Build tags based on loan type for better segmentation
+    const tags = ['Application In Progress'];
+
+    // Add loan type specific tags
+    if (loanType) {
+      tags.push(loanType);
+      // Add "Interest in X" tag for marketing segmentation
+      const loanTypeLabels: Record<string, string> = {
+        'sba_loan': 'Interest in SBA Loan',
+        'line_of_credit': 'Interest in Line of Credit',
+        'equipment_finance': 'Interest in Equipment Finance',
+        'mca': 'Interest in MCA',
+        'invoice_factoring': 'Interest in Invoice Factoring',
+        'invoice_financing': 'Interest in Invoice Financing',
+        'general': 'Interest in General Financing',
+        'quick_app': 'Quick App Started',
+      };
+      if (loanTypeLabels[loanType]) {
+        tags.push(loanTypeLabels[loanType]);
+      }
+    }
+
     // Send to GHL
     const contactId = await ghlService.createOrUpdateContact({
       firstName,
       lastName,
       email,
       phone,
-      tags: ['Application In Progress', loanType],
+      tags,
       source: 'Trinity Finance SmartForm',
       customFields: [
         {

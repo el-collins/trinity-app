@@ -5,18 +5,18 @@
 export const config = {
   port: process.env.PORT || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
-  
+
   neo4j: {
     uri: process.env.NEO4J_URI || 'bolt://localhost:7687',
     user: process.env.NEO4J_USER || 'neo4j',
     password: process.env.NEO4J_PASSWORD || 'password',
   },
-  
+
   firestore: {
     projectId: process.env.FIRESTORE_PROJECT_ID || '',
     credentialsPath: process.env.GOOGLE_APPLICATION_CREDENTIALS || '',
   },
-  
+
   goHighLevel: {
     apiKey: process.env.GHL_API_KEY || '',
     locationId: process.env.GHL_LOCATION_ID || '',
@@ -28,14 +28,25 @@ export const config = {
       submissionDate: process.env.GHL_FIELD_SUBMISSION_DATE || new Date().toISOString().split('T')[0],
     },
   },
-  
+
   api: {
     baseUrl: process.env.API_BASE_URL || 'http://localhost:3000',
   },
-  
+
   n8n: {
     webhookUrl: process.env.N8N_WEBHOOK_URL || '',
     apiKey: process.env.N8N_API_KEY,
+  },
+
+  // Team notification settings
+  notifications: {
+    // Comma-separated list of team member emails for notifications
+    teamEmails: (process.env.NOTIFICATION_TEAM_EMAILS || 'ccollins@hordanso.com').split(',').map(e => e.trim()),
+    // Enable/disable specific notification types
+    onApplicationSubmitted: process.env.NOTIFY_ON_APPLICATION_SUBMITTED !== 'false',
+    onDocumentsUploaded: process.env.NOTIFY_ON_DOCUMENTS_UPLOADED !== 'false',
+    // Admin email for system notifications
+    adminEmail: process.env.ADMIN_EMAIL || 'ccollins@hordanso.com',
   },
 };
 

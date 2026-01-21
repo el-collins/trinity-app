@@ -7,6 +7,9 @@ import ReviewPage from './ReviewPage';
 import SaveAndExitModal from '../Modals/SaveAndExitModal';
 import { getResumeTokenFromURL } from '@/lib/utils/urlState';
 
+// Auto-save status type
+type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
 interface DynamicFormContainerProps {
   loanTypeId: string;
   applicationId?: string; // For resuming existing applications
@@ -43,6 +46,10 @@ export default function DynamicFormContainer({
   const [isFromQuickApp, setIsFromQuickApp] = useState(false);
   const [returnToReview, setReturnToReview] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+
+  // Auto-save state
+  const [autoSaveStatus, setAutoSaveStatus] = useState<AutoSaveStatus>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
   // AI is always enabled based on env var (no UI toggle)
   // But disable AI when coming from Quick App to prevent skipping unfilled sections
@@ -161,24 +168,38 @@ export default function DynamicFormContainer({
     }
   }, [savedResponses, structure, setFieldValue]);
 
-  // Auto-save progress (debounced)
+  // Auto-save progress (debounced) with status indicator
   useEffect(() => {
-    if (!applicationId || !loanTypeId || Object.keys(responses).length === 0) return;
+    if (!loanTypeId || Object.keys(responses).length === 0) return;
+
+    // Generate application ID if not provided
+    const effectiveAppId = applicationId || `draft_${loanTypeId}_${Date.now()}`;
 
     const timeoutId = setTimeout(async () => {
+      setAutoSaveStatus('saving');
       try {
-        await fetch('/api/autosave', {
+        const response = await fetch('/api/autosave', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            applicationId,
+            applicationId: effectiveAppId,
             loanTypeId,
             responses,
             currentSectionIndex,
           }),
         });
+
+        if (response.ok) {
+          setAutoSaveStatus('saved');
+          setLastSavedAt(new Date());
+          // Reset to idle after 3 seconds
+          setTimeout(() => setAutoSaveStatus('idle'), 3000);
+        } else {
+          setAutoSaveStatus('error');
+        }
       } catch (error) {
         console.error('Auto-save failed:', error);
+        setAutoSaveStatus('error');
       }
     }, 2000); // Debounce: save 2 seconds after last change
 
@@ -345,16 +366,52 @@ export default function DynamicFormContainer({
             </p>
           </div>
 
-          {/* Save & Exit Button */}
-          <button
-            onClick={() => setShowSaveModal(true)}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-            </svg>
-            Save & Exit
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Auto-save Status Indicator */}
+            <div className="flex items-center gap-2 text-sm">
+              {autoSaveStatus === 'saving' && (
+                <span className="flex items-center gap-1 text-gray-500">
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Saving...
+                </span>
+              )}
+              {autoSaveStatus === 'saved' && (
+                <span className="flex items-center gap-1 text-green-600">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Saved
+                </span>
+              )}
+              {autoSaveStatus === 'error' && (
+                <span className="flex items-center gap-1 text-red-600">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Save failed
+                </span>
+              )}
+              {autoSaveStatus === 'idle' && lastSavedAt && (
+                <span className="text-gray-400 text-xs">
+                  Last saved {lastSavedAt.toLocaleTimeString()}
+                </span>
+              )}
+            </div>
+
+            {/* Save & Exit Button */}
+            <button
+              onClick={() => setShowSaveModal(true)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+              </svg>
+              Save & Exit
+            </button>
+          </div>
         </div>
         
         {/* Progress Bar */}
@@ -399,7 +456,7 @@ export default function DynamicFormContainer({
           {aiPlanning ? (
             <>
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              AI Planning...
+              Processing...
             </>
           ) : (
             <>
@@ -413,9 +470,6 @@ export default function DynamicFormContainer({
               ) : (
                 <>
                   {isLastSection ? (onComplete ? 'Continue' : 'Review Application') : 'Next'}
-                  {aiEnabled && !isLastSection && (
-                    <span className="text-xs opacity-75">✨ AI</span>
-                  )}
                 </>
               )}
             </>
