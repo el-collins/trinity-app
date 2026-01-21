@@ -48,7 +48,7 @@ export function generateFieldSchema(field: FormField): z.ZodTypeAny {
       // Checkbox is similar to boolean but stricter for required consent fields
       schema = z.union([z.boolean(), z.literal('true'), z.literal('false')]).transform(val => {
         if (typeof val === 'boolean') return val;
-        return val === 'true' || val === true;
+        return val === 'true';
       });
       break;
 
