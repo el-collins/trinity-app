@@ -2,10 +2,18 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
+interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+}
+
 interface AdminAuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (password: string) => Promise<boolean>;
+  user: AdminUser | null;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
 
@@ -17,15 +25,17 @@ const SESSION_DURATION = 8 * 60 * 60 * 1000; // 8 hours
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<AdminUser | null>(null);
 
   useEffect(() => {
     // Check for existing session
     const session = localStorage.getItem(ADMIN_SESSION_KEY);
     if (session) {
       try {
-        const { expiry } = JSON.parse(session);
-        if (expiry > Date.now()) {
+        const { expiry, user: storedUser } = JSON.parse(session);
+        if (expiry > Date.now() && storedUser) {
           setIsAuthenticated(true);
+          setUser(storedUser);
         } else {
           localStorage.removeItem(ADMIN_SESSION_KEY);
         }
@@ -36,40 +46,43 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = async (password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const response = await fetch('/api/admin/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ email, password }),
       });
 
       const result = await response.json();
 
-      if (result.success) {
+      if (result.success && result.user) {
         const session = {
           authenticated: true,
           expiry: Date.now() + SESSION_DURATION,
+          user: result.user,
         };
         localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
         setIsAuthenticated(true);
-        return true;
+        setUser(result.user);
+        return { success: true };
       }
 
-      return false;
+      return { success: false, error: result.error || 'Login failed' };
     } catch (error) {
       console.error('Admin login error:', error);
-      return false;
+      return { success: false, error: 'An error occurred during login' };
     }
   };
 
   const logout = () => {
     localStorage.removeItem(ADMIN_SESSION_KEY);
     setIsAuthenticated(false);
+    setUser(null);
   };
 
   return (
-    <AdminAuthContext.Provider value={{ isAuthenticated, isLoading, login, logout }}>
+    <AdminAuthContext.Provider value={{ isAuthenticated, isLoading, user, login, logout }}>
       {children}
     </AdminAuthContext.Provider>
   );

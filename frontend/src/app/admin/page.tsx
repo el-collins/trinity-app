@@ -7,6 +7,7 @@ import { useAdminAuth } from '@/lib/contexts/AdminAuthContext';
 export default function AdminLoginPage() {
   const { isAuthenticated, isLoading, login } = useAdminAuth();
   const router = useRouter();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -22,12 +23,12 @@ export default function AdminLoginPage() {
     setError('');
     setIsSubmitting(true);
 
-    const success = await login(password);
+    const result = await login(email, password);
 
-    if (success) {
+    if (result.success) {
       router.push('/admin/applications');
     } else {
-      setError('Invalid password');
+      setError(result.error || 'Invalid credentials');
       setPassword('');
     }
 
@@ -72,23 +73,41 @@ export default function AdminLoginPage() {
           </div>
 
           {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Email Address
+              </label>
+              <input
+                type="email"
+                id="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@example.com"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                required
+                autoFocus
+              />
+            </div>
+
             <div>
               <label
                 htmlFor="password"
                 className="block text-sm font-medium text-gray-700 mb-2"
               >
-                Admin Password
+                Password
               </label>
               <input
                 type="password"
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter admin password"
+                placeholder="Enter your password"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 required
-                autoFocus
               />
             </div>
 
@@ -133,6 +152,9 @@ export default function AdminLoginPage() {
           </form>
 
           <div className="mt-6 text-center">
+            <p className="text-xs text-gray-400 mb-4">
+              First time? Use any email with the admin password from your .env file
+            </p>
             <a
               href="/"
               className="text-sm text-gray-500 hover:text-gray-700 transition-colors"

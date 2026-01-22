@@ -40,11 +40,11 @@ export async function GET(request: NextRequest) {
 
       // Extract key information from responses for list view
       const responses = data.responses || {};
-      const businessName = responses.business_name || responses.company_name || 'N/A';
+      const businessName = responses.business_name || responses.legal_business_name || 'N/A';
       const contactName = `${responses.first_name || responses.contact_first_name || ''} ${responses.last_name || responses.contact_last_name || ''}`.trim() || 'N/A';
       const email = data.applicantEmail || responses.business_email || responses.email || 'N/A';
       const phone = responses.business_phone || responses.phone || responses.mobile_phone || 'N/A';
-      const requestedAmount = responses.requested_amount || responses.loan_amount || responses.funding_amount || null;
+      const requestedAmount = responses.requested_amount || responses.loan_amount || responses.desired_funding_amount || null;
 
       return {
         id: doc.id,
