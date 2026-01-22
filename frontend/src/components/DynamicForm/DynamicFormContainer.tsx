@@ -6,6 +6,7 @@ import DynamicSection from './DynamicSection';
 import ReviewPage from './ReviewPage';
 import SaveAndExitModal from '../Modals/SaveAndExitModal';
 import { getResumeTokenFromURL } from '@/lib/utils/urlState';
+import { applyDerivations, FieldDerivation } from '@/lib/utils/fieldDerivations';
 
 // Auto-save status type
 type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -46,6 +47,7 @@ export default function DynamicFormContainer({
   const [isFromQuickApp, setIsFromQuickApp] = useState(false);
   const [returnToReview, setReturnToReview] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [autoFilledFields, setAutoFilledFields] = useState<string[]>([]);
 
   // Auto-save state
   const [autoSaveStatus, setAutoSaveStatus] = useState<AutoSaveStatus>('idle');
@@ -74,6 +76,8 @@ export default function DynamicFormContainer({
         setIsFromQuickApp(true);
         // Reset section index to start from the beginning of the full application
         goToSection(0);
+        // Clear completed sections since this is a new application type
+        useFormStore.setState({ completedSections: [] });
       }
 
       setLoading(true);
@@ -95,6 +99,43 @@ export default function DynamicFormContainer({
 
         setStructure(transformedData);
         setLoanTypeId(loanTypeId);
+
+        // Apply field derivations when coming from Quick App
+        if (isComingFromQuickApp) {
+          try {
+            const { responses: quickAppResponses } = useFormStore.getState();
+            console.log('Fetching field derivations for auto-fill...');
+
+            const derivationsResponse = await fetch('/api/neo4j/field-derivations');
+            if (derivationsResponse.ok) {
+              const derivations: FieldDerivation[] = await derivationsResponse.json();
+              console.log('Field derivations loaded:', derivations.length);
+
+              // Apply derivations to get pre-filled values
+              const derivedResults = applyDerivations(derivations, quickAppResponses);
+              console.log('Derived field values:', derivedResults);
+
+              // Pre-fill each derived field
+              const filledFields: string[] = [];
+              for (const [fieldId, result] of Object.entries(derivedResults)) {
+                // Only set if the field doesn't already have a value
+                if (!quickAppResponses[fieldId]) {
+                  setFieldValue(fieldId, result.value);
+                  filledFields.push(fieldId);
+                  console.log(`Auto-filled ${fieldId} = ${result.value} (from ${result.derivedFrom.join(', ')} via ${result.formula})`);
+                }
+              }
+
+              setAutoFilledFields(filledFields);
+              if (filledFields.length > 0) {
+                console.log(`Auto-filled ${filledFields.length} fields from Quick App data`);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to apply field derivations:', error);
+            // Don't block form loading if derivations fail
+          }
+        }
 
         // AFTER structure is loaded, load resume token if present
         if (token) {

@@ -43,13 +43,11 @@ export async function GET(request: NextRequest) {
     }
 
     const query = `
-      MATCH (lt:LoanType {id: $loanTypeId})-[r:REQUIRES_DOCUMENT]->(d:Document)
+      MATCH (lt:LoanType {id: $loanTypeId})-[:REQUIRES_DOCUMENT]->(d:Document)
       RETURN d {
-        .*,
-        required: r.required,
-        order: r.order
+        .*
       } AS document
-      ORDER BY r.order
+      ORDER BY d.order
     `;
 
     const session = neo4jConfigService.getSession();

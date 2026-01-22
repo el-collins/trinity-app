@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { FormField } from '@/lib/types/schema';
 
 interface NumberInputProps {
@@ -10,40 +11,97 @@ interface NumberInputProps {
 }
 
 export default function NumberInput({ field, value, error, onChange }: NumberInputProps) {
+  const isCurrency = field.type === 'CURRENCY';
+  const isPercentage = field.type === 'PERCENTAGE';
+
+  // Track the display value separately for formatted input
+  const [displayValue, setDisplayValue] = useState('');
+
+  // Format number with thousand separators
+  const formatWithCommas = (num: number): string => {
+    if (isNaN(num) || num === 0) return '';
+    // Handle decimals for currency
+    if (isCurrency) {
+      const parts = num.toString().split('.');
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      return parts.join('.');
+    }
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  };
+
+  // Parse formatted string back to number
+  const parseFormattedValue = (val: string): number => {
+    // Remove all non-numeric characters except decimal point and minus
+    const cleanValue = val.replace(/[^0-9.-]/g, '');
+    const num = parseFloat(cleanValue);
+    return isNaN(num) ? 0 : num;
+  };
+
+  // Sync display value with actual value
+  useEffect(() => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    if (!isNaN(numValue) && numValue !== 0) {
+      setDisplayValue(formatWithCommas(numValue));
+    } else if (value === '' || value === 0) {
+      setDisplayValue('');
+    }
+  }, [value, isCurrency]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    
+
     // Allow empty string for clearing
     if (val === '') {
+      setDisplayValue('');
       onChange(0);
       return;
     }
-    
-    const numValue = parseFloat(val);
-    if (!isNaN(numValue)) {
+
+    // For currency/percentage, handle formatted input
+    if (isCurrency || isPercentage) {
+      // Only allow digits, commas, decimal point, and minus sign
+      const sanitized = val.replace(/[^0-9,.-]/g, '');
+      setDisplayValue(sanitized);
+
+      // Parse and send the numeric value
+      const numValue = parseFormattedValue(sanitized);
       onChange(numValue);
+    } else {
+      // Standard number handling
+      const numValue = parseFloat(val);
+      if (!isNaN(numValue)) {
+        onChange(numValue);
+      }
     }
   };
 
-  // Format currency display
-  const formatDisplay = (val: number | string) => {
-    if (field.type === 'CURRENCY') {
-      const num = typeof val === 'string' ? parseFloat(val) : val;
-      return isNaN(num) ? '' : num.toString();
+  // Format on blur for better UX
+  const handleBlur = () => {
+    if (isCurrency || isPercentage) {
+      const numValue = parseFormattedValue(displayValue);
+      if (numValue !== 0) {
+        setDisplayValue(formatWithCommas(numValue));
+      }
     }
-    if (field.type === 'PERCENTAGE') {
-      return val.toString();
+  };
+
+  // Get display value based on field type
+  const getDisplayValue = (): string => {
+    if (isCurrency || isPercentage) {
+      return displayValue;
     }
-    return val.toString();
+    // For regular numbers
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    return isNaN(numValue) || numValue === 0 ? '' : numValue.toString();
   };
 
   const getPrefix = () => {
-    if (field.type === 'CURRENCY') return '$';
+    if (isCurrency) return '$';
     return '';
   };
 
   const getSuffix = () => {
-    if (field.type === 'PERCENTAGE') return '%';
+    if (isPercentage) return '%';
     return '';
   };
 
@@ -53,29 +111,31 @@ export default function NumberInput({ field, value, error, onChange }: NumberInp
         {field.label}
         {field.required && <span className="text-red-500 ml-1">*</span>}
       </label>
-      
+
       {field.helpText && (
         <p className="text-sm text-gray-500 mb-2">{field.helpText}</p>
       )}
-      
+
       <div className="relative">
         {getPrefix() && (
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
             {getPrefix()}
           </span>
         )}
-        
+
         <input
           id={field.id}
           name={field.name}
-          type="number"
-          value={formatDisplay(value)}
+          type={isCurrency || isPercentage ? 'text' : 'number'}
+          inputMode="decimal"
+          value={getDisplayValue()}
           onChange={handleChange}
-          placeholder={field.placeholder}
+          onBlur={handleBlur}
+          placeholder={field.placeholder || (isCurrency ? '0' : isPercentage ? '0' : '')}
           required={field.required}
-          min={field.validation?.min}
-          max={field.validation?.max}
-          step={field.type === 'CURRENCY' ? '0.01' : '1'}
+          min={!isCurrency && !isPercentage ? field.validation?.min : undefined}
+          max={!isCurrency && !isPercentage ? field.validation?.max : undefined}
+          step={!isCurrency && !isPercentage ? (field.type === 'CURRENCY' ? '0.01' : '1') : undefined}
           className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
             getPrefix() ? 'pl-8' : ''
           } ${getSuffix() ? 'pr-8' : ''} ${
@@ -84,14 +144,14 @@ export default function NumberInput({ field, value, error, onChange }: NumberInp
               : 'border-gray-300'
           }`}
         />
-        
+
         {getSuffix() && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
             {getSuffix()}
           </span>
         )}
       </div>
-      
+
       {error && (
         <p className="mt-1 text-sm text-red-600">{error}</p>
       )}

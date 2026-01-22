@@ -51,16 +51,26 @@ export default function DocumentUploadPage() {
 
       setTokenData(tokenResult);
 
-      // Fetch required documents for this loan type
-      const docsResponse = await fetch(`/api/documents/required?loanTypeId=${tokenResult.loanTypeId}`);
-      const docsResult = await docsResponse.json();
+      // Only fetch documents if loanTypeId is available
+      if (tokenResult.loanTypeId) {
+        const docsResponse = await fetch(`/api/documents/required?loanTypeId=${tokenResult.loanTypeId}`);
+        const docsResult = await docsResponse.json();
 
-      if (docsResult.documents) {
-        setDocuments(docsResult.documents);
+        if (docsResult.documents && Array.isArray(docsResult.documents)) {
+          // Ensure each document has required properties with defaults
+          const sanitizedDocs = docsResult.documents.map((doc: Document) => ({
+            ...doc,
+            acceptedFormats: doc.acceptedFormats || ['PDF', 'JPG', 'JPEG', 'PNG'],
+            maxFileSizeMB: doc.maxFileSizeMB || 10,
+            required: doc.required ?? true,
+          }));
+          setDocuments(sanitizedDocs);
+        }
       }
 
       setLoading(false);
     } catch (err) {
+      console.error('Error loading document upload page:', err);
       setError('Failed to load upload page. Please try again.');
       setLoading(false);
     }
@@ -148,7 +158,7 @@ export default function DocumentUploadPage() {
             Application ID: <span className="font-mono">{tokenData?.applicationId}</span>
           </p>
           <p className="text-gray-600">
-            Loan Type: <span className="font-semibold">{tokenData?.loanTypeId.toUpperCase()}</span>
+            Loan Type: <span className="font-semibold">{tokenData?.loanTypeId?.toUpperCase() || 'N/A'}</span>
           </p>
         </div>
 
@@ -251,16 +261,18 @@ function DocumentCard({ document, onUpload, uploading }: DocumentCardProps) {
     setValidationError(null);
 
     // Validate file size
-    if (file.size > document.maxFileSizeMB * 1024 * 1024) {
-      setValidationError(`File too large. Maximum size: ${document.maxFileSizeMB}MB`);
+    const maxFileSizeMB = document.maxFileSizeMB || 10;
+    if (file.size > maxFileSizeMB * 1024 * 1024) {
+      setValidationError(`File too large. Maximum size: ${maxFileSizeMB}MB`);
       return;
     }
 
-    // Validate file type
+    // Validate file type (if acceptedFormats is defined)
     const ext = file.name.split('.').pop()?.toUpperCase();
-    if (!ext || !document.acceptedFormats.includes(ext)) {
+    const acceptedFormats = document.acceptedFormats || ['PDF', 'JPG', 'JPEG', 'PNG'];
+    if (!ext || !acceptedFormats.includes(ext)) {
       setValidationError(
-        `Invalid file type. Accepted formats: ${document.acceptedFormats.join(', ')}`
+        `Invalid file type. Accepted formats: ${acceptedFormats.join(', ')}`
       );
       return;
     }
@@ -289,7 +301,7 @@ function DocumentCard({ document, onUpload, uploading }: DocumentCardProps) {
           </div>
           <p className="text-sm text-gray-600 mb-2">{document.description}</p>
           <p className="text-xs text-gray-500">
-            Accepted: {document.acceptedFormats.join(', ')} • Max: {document.maxFileSizeMB}MB
+            Accepted: {(document.acceptedFormats || ['PDF', 'JPG', 'JPEG', 'PNG']).join(', ')} • Max: {document.maxFileSizeMB || 10}MB
           </p>
         </div>
 
@@ -306,7 +318,7 @@ function DocumentCard({ document, onUpload, uploading }: DocumentCardProps) {
         <div className="space-y-3">
           <input
             type="file"
-            accept={document.acceptedFormats.map((f) => `.${f.toLowerCase()}`).join(',')}
+            accept={(document.acceptedFormats || ['PDF', 'JPG', 'JPEG', 'PNG']).map((f) => `.${f.toLowerCase()}`).join(',')}
             onChange={handleFileSelect}
             disabled={uploading}
             className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
