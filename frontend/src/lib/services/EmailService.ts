@@ -14,6 +14,13 @@ class EmailService {
   }
 
   /**
+   * Get logo URL for email templates
+   */
+  private getLogoUrl(): string {
+    return 'https://firebasestorage.googleapis.com/v0/b/trinityiq.firebasestorage.app/o/Logo%2Ftrinityiq-half.png?alt=media&token=3a5ebff1-2e6b-4315-bb73-7f86c2d05b7b';
+  }
+
+  /**
    * Initialize nodemailer transporter with SMTP config
    */
   private initializeTransporter() {
@@ -222,8 +229,9 @@ class EmailService {
         <title>Document Uploaded</title>
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">Document Uploaded</h1>
+        <div style="background-color: #ffffff; border-bottom: 2px solid #2563eb; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <img src="${this.getLogoUrl()}" alt="Trinity Finance Logo" style="width: 60px; height: auto; margin-bottom: 10px;" />
+          <h1 style="color: #2563eb; margin: 10px 0 0; font-size: 24px; font-weight: bold;">Document Uploaded</h1>
         </div>
 
         <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
@@ -251,7 +259,7 @@ class EmailService {
           </div>
 
           <div style="text-align: center;">
-            <a href="${data.documentUrl}" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Document</a>
+            <a href="${data.documentUrl}" style="display: inline-block; background: #2563eb; color: #2563eb; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Document</a>
           </div>
         </div>
 
@@ -324,8 +332,9 @@ This is an automated notification from Trinity Finance SmartForm
         <table role="presentation" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <!-- Header -->
           <tr>
-            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
+            <td style="padding: 40px 40px 20px; text-align: center; background-color: #ffffff; border-bottom: 2px solid #2563eb; border-radius: 8px 8px 0 0;">
+              <img src="${this.getLogoUrl()}" alt="Trinity Finance Logo" style="width: 80px; height: auto; margin-bottom: 15px;" />
+              <h1 style="margin: 0; color: #2563eb; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
             </td>
           </tr>
 
@@ -390,7 +399,7 @@ This is an automated notification from Trinity Finance SmartForm
           <tr>
             <td style="padding: 30px 40px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
               <p style="margin: 0 0 10px; color: #6b7280; font-size: 14px; text-align: center;">
-                Questions? Contact us at <a href="mailto:iq@financetrinity.com" style="color: #667eea; text-decoration: none;">iq@financetrinity.com</a>
+                Questions? Contact us at <a href="mailto:iq@financetrinity.com" style="color: #2563eb; text-decoration: none;">iq@financetrinity.com</a>
               </p>
             </td>
           </tr>
@@ -470,7 +479,10 @@ Questions? Contact us at iq@financetrinity.com
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
   <div style="max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
-    <h2 style="color: #667eea;">New Application Received</h2>
+    <div style="text-align: center; margin-bottom: 20px;">
+      <img src="${this.getLogoUrl()}" alt="Trinity Finance Logo" style="width: 60px; height: auto;" />
+    </div>
+    <h2 style="color: #2563eb;">New Application Received</h2>
 
     <div style="background-color: #ffffff; padding: 20px; border-radius: 5px; margin-top: 20px;">
       <h3>Application Details</h3>
@@ -607,8 +619,9 @@ Please review this application in the admin dashboard.
         <table role="presentation" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <!-- Header -->
           <tr>
-            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
+            <td style="padding: 40px 40px 20px; text-align: center; background-color: #ffffff; border-bottom: 2px solid #2563eb; border-radius: 8px 8px 0 0;">
+              <img src="${this.getLogoUrl()}" alt="Trinity Finance Logo" style="width: 80px; height: auto; margin-bottom: 15px;" />
+              <h1 style="margin: 0; color: #2563eb; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
             </td>
           </tr>
 
@@ -631,7 +644,7 @@ Please review this application in the admin dashboard.
 
               <!-- CTA Button -->
               <div style="text-align: center; margin: 40px 0;">
-                <a href="${data.applicationUrl}" style="display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <a href="${data.applicationUrl}" style="display: inline-block; padding: 16px 40px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                   Start My Application
                 </a>
               </div>
@@ -783,8 +796,9 @@ Questions? Contact us at iq@financetrinity.com
         <table role="presentation" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <!-- Header -->
           <tr>
-            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
+            <td style="padding: 40px 40px 20px; text-align: center; background-color: #ffffff; border-bottom: 2px solid #2563eb; border-radius: 8px 8px 0 0;">
+              <img src="${this.getLogoUrl()}" alt="Trinity Finance Logo" style="width: 80px; height: auto; margin-bottom: 15px;" />
+              <h1 style="margin: 0; color: #2563eb; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
             </td>
           </tr>
 
@@ -815,7 +829,7 @@ Questions? Contact us at iq@financetrinity.com
 
               <!-- CTA Button -->
               <div style="text-align: center; margin: 40px 0;">
-                <a href="${data.uploadLink}" style="display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <a href="${data.uploadLink}" style="display: inline-block; padding: 16px 40px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                   Upload Documents
                 </a>
               </div>
@@ -945,8 +959,9 @@ Questions? Contact us at iq@financetrinity.com
       <td style="padding: 40px 0; text-align: center;">
         <table role="presentation" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <tr>
-            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
+            <td style="padding: 40px 40px 20px; text-align: center; background-color: #ffffff; border-bottom: 2px solid #2563eb; border-radius: 8px 8px 0 0;">
+              <img src="${this.getLogoUrl()}" alt="Trinity Finance Logo" style="width: 80px; height: auto; margin-bottom: 15px;" />
+              <h1 style="margin: 0; color: #2563eb; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
             </td>
           </tr>
           <tr>
@@ -959,13 +974,13 @@ Questions? Contact us at iq@financetrinity.com
                 We saved your progress for the <strong>${data.loanType}</strong> application. You can pick up exactly where you left off by clicking the button below.
               </p>
               <div style="text-align: center; margin: 40px 0;">
-                <a href="${data.resumeLink}" style="display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <a href="${data.resumeLink}" style="display: inline-block; padding: 16px 40px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                   Resume Application
                 </a>
               </div>
               <p style="margin: 0 0 20px; color: #4b5563; font-size: 14px;">
                 Alternatively, copy and paste this link into your browser:<br>
-                <a href="${data.resumeLink}" style="color: #667eea; word-break: break-all;">${data.resumeLink}</a>
+                <a href="${data.resumeLink}" style="color: #2563eb; word-break: break-all;">${data.resumeLink}</a>
               </p>
               <p style="margin: 20px 0 0; color: #6b7280; font-size: 14px; text-align: center;">
                 This link will expire in 30 days.
@@ -1063,6 +1078,7 @@ This link will expire in 30 days.
           <!-- Header -->
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #1f2937 0%, #374151 100%); border-radius: 8px 8px 0 0;">
+              <img src="${this.getLogoUrl()}" alt="Trinity Finance Logo" style="width: 80px; height: auto; margin-bottom: 15px;" />
               <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
               <p style="margin: 10px 0 0; color: #9ca3af; font-size: 14px;">Admin Portal</p>
             </td>
