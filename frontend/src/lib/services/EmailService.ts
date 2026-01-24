@@ -1002,6 +1002,153 @@ This link will expire in 30 days.
   }
 
   /**
+   * Send admin invite email with password setup link
+   */
+  async sendAdminInvite(
+    recipientEmail: string,
+    data: {
+      name: string;
+      setupUrl: string;
+      invitedBy?: string;
+    }
+  ): Promise<boolean> {
+    if (!this.transporter) {
+      console.error('Email service not initialized. Cannot send email.');
+      return false;
+    }
+
+    try {
+      const fromName = process.env.EMAIL_FROM_NAME || 'Trinity Finance';
+      const fromEmail = process.env.EMAIL_USER || 'noreply@financetrinity.com';
+
+      const mailOptions = {
+        from: `"${fromName}" <${fromEmail}>`,
+        to: recipientEmail,
+        subject: 'You\'ve Been Invited to Trinity Finance Admin Portal',
+        html: this.getAdminInviteHTML(data),
+        text: this.getAdminInviteText(data),
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+
+      console.log('Admin invite email sent successfully:', {
+        messageId: info.messageId,
+        recipient: recipientEmail,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to send admin invite email:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Generate HTML email for admin invite
+   */
+  private getAdminInviteHTML(data: { name: string; setupUrl: string; invitedBy?: string }): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Invitation</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 0; text-align: center;">
+        <table role="presentation" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #1f2937 0%, #374151 100%); border-radius: 8px 8px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
+              <p style="margin: 10px 0 0; color: #9ca3af; font-size: 14px;">Admin Portal</p>
+            </td>
+          </tr>
+
+          <!-- Icon -->
+          <tr>
+            <td style="padding: 30px 40px 20px; text-align: center;">
+              <div style="display: inline-block; width: 80px; height: 80px; background-color: #3b82f6; border-radius: 50%;">
+                <span style="color: #ffffff; font-size: 36px; line-height: 80px;">&#128272;</span>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 0 40px 30px;">
+              <h2 style="margin: 0 0 20px; color: #1f2937; font-size: 24px; text-align: center;">You're Invited!</h2>
+
+              <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Dear ${data.name},
+              </p>
+
+              <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                You've been invited to join the Trinity Finance Admin Portal${data.invitedBy ? ` by ${data.invitedBy}` : ''}. This portal allows you to manage loan applications, view customer data, and more.
+              </p>
+
+              <p style="margin: 0 0 30px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Click the button below to set up your password and activate your account.
+              </p>
+
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 40px 0;">
+                <a href="${data.setupUrl}" style="display: inline-block; padding: 16px 40px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                  Set Up My Password
+                </a>
+              </div>
+
+              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6; text-align: center;">
+                <strong>This link will expire in 48 hours.</strong><br>
+                If you didn't expect this invitation, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 40px; text-align: center; background-color: #1f2937; border-radius: 0 0 8px 8px;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                &copy; ${new Date().getFullYear()} Trinity Finance. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+  }
+
+  /**
+   * Generate plain text email for admin invite
+   */
+  private getAdminInviteText(data: { name: string; setupUrl: string; invitedBy?: string }): string {
+    return `
+TRINITY FINANCE - Admin Portal Invitation
+
+Dear ${data.name},
+
+You've been invited to join the Trinity Finance Admin Portal${data.invitedBy ? ` by ${data.invitedBy}` : ''}. This portal allows you to manage loan applications, view customer data, and more.
+
+SET UP YOUR PASSWORD
+--------------------
+${data.setupUrl}
+
+This link will expire in 48 hours.
+
+If you didn't expect this invitation, you can safely ignore this email.
+
+© ${new Date().getFullYear()} Trinity Finance. All rights reserved.
+    `.trim();
+  }
+
+  /**
    * Verify email configuration is working
    */
   async verifyConnection(): Promise<boolean> {

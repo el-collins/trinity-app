@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { firestore } from '@/lib/firebase/admin';
-import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import { emailService } from '@/lib/services/EmailService';
 
 // GET - List all admin users
 export async function GET() {
@@ -33,14 +34,23 @@ export async function GET() {
   }
 }
 
-// POST - Create new admin user
+// POST - Create new admin user and send invite email
 export async function POST(request: NextRequest) {
   try {
-    const { email, name, password, role } = await request.json();
+    const { email, name, role } = await request.json();
 
-    if (!email || !name || !password) {
+    if (!email || !name) {
       return NextResponse.json(
-        { error: 'Email, name, and password are required' },
+        { error: 'Email and name are required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: 'Invalid email format' },
         { status: 400 }
       );
     }
@@ -58,25 +68,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Hash the password
-    const saltRounds = 12;
-    const passwordHash = await bcrypt.hash(password, saltRounds);
+    // Generate a secure setup token
+    const setupToken = crypto.randomBytes(32).toString('hex');
+    const setupTokenHash = crypto.createHash('sha256').update(setupToken).digest('hex');
+    const setupTokenExpiry = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
 
-    // Create the user
+    // Create the user (inactive until they set their password)
     const newUser = {
       email: email.toLowerCase(),
       name,
-      passwordHash,
       role: role || 'admin',
-      isActive: true,
+      isActive: false, // Will be activated when they set their password
+      setupTokenHash,
+      setupTokenExpiry,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
     const docRef = await firestore.collection('adminUsers').add(newUser);
 
+    // Build the setup URL
+    const baseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
+    const setupUrl = `${baseUrl}/admin/setup-password?token=${setupToken}`;
+
+    // Send invite email
+    const emailSent = await emailService.sendAdminInvite(email, {
+      name,
+      setupUrl,
+    });
+
+    if (!emailSent) {
+      console.warn('Failed to send invite email, but user was created');
+    }
+
     return NextResponse.json({
       success: true,
+      emailSent,
       user: {
         id: docRef.id,
         email: newUser.email,
