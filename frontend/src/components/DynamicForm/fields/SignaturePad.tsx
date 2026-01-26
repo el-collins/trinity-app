@@ -88,6 +88,28 @@ export default function SignaturePad({ field, value, error, onChange, onBlur }: 
         <p className="text-sm text-gray-500 mb-3">{field.helpText}</p>
       )}
 
+      {/* Authorization Consent Agreement */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4 max-h-48 overflow-y-auto">
+        <h4 className="text-sm font-semibold text-gray-800 mb-2">Authorization & Consent Agreement</h4>
+        <div className="text-xs text-gray-600 space-y-2">
+          <p>
+            By signing below, I certify that all information provided in this application is true and complete to the best of my knowledge. I understand that any false statements or omissions may result in denial of the application or termination of any resulting agreement.
+          </p>
+          <p>
+            <strong>Credit Authorization:</strong> I authorize Trinity Finance and its designated agents to obtain my credit report and verify all information provided in this application, including but not limited to employment, bank accounts, and business records. This authorization extends to obtaining credit reports at any time during the application process and the term of any resulting agreement.
+          </p>
+          <p>
+            <strong>Communication Consent:</strong> I consent to be contacted by Trinity Finance, its affiliates, and partners via telephone, email, SMS/text message, and mail at the contact information provided, including for marketing purposes. I understand I may opt out of marketing communications at any time.
+          </p>
+          <p>
+            <strong>Electronic Signature Consent:</strong> I agree that my electronic signature below has the same legal effect as a handwritten signature. I consent to conduct this transaction electronically and to receive disclosures and notices electronically.
+          </p>
+          <p>
+            <strong>Information Sharing:</strong> I authorize Trinity Finance to share my application information with potential lenders, funding partners, and service providers as necessary to process my application and provide financing options.
+          </p>
+        </div>
+      </div>
+
       <div
         ref={containerRef}
         className={`relative border-2 rounded-lg bg-white overflow-hidden ${
