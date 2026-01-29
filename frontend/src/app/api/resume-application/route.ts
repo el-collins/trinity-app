@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
     if (appDoc.exists) {
       const appData = appDoc.data();
       return NextResponse.json({
+        applicationId, // Include applicationId for tracking
         loanTypeId: appData?.loanTypeId,
         responses: appData?.responses || {},
         currentSectionIndex: 0, // Start at beginning for submitted apps

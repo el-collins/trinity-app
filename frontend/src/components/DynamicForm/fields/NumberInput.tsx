@@ -11,8 +11,18 @@ interface NumberInputProps {
 }
 
 export default function NumberInput({ field, value, error, onChange }: NumberInputProps) {
-  const isCurrency = field.type === 'CURRENCY';
-  const isPercentage = field.type === 'PERCENTAGE';
+  // Case-insensitive check for field types
+  const fieldType = field.type?.toLowerCase();
+  const fieldName = (field.name || field.id || '').toLowerCase();
+  const fieldLabel = (field.label || '').toLowerCase();
+
+  // Detect currency fields by type OR by common naming patterns
+  const currencyKeywords = ['revenue', 'income', 'amount', 'funding', 'salary', 'price', 'cost', 'balance', 'payment', 'loan'];
+  const isCurrencyByName = currencyKeywords.some(keyword =>
+    fieldName.includes(keyword) || fieldLabel.includes(keyword)
+  );
+  const isCurrency = fieldType === 'currency' || (fieldType === 'number' && isCurrencyByName);
+  const isPercentage = fieldType === 'percentage';
 
   // Track the display value separately for formatted input
   const [displayValue, setDisplayValue] = useState('');
@@ -135,7 +145,7 @@ export default function NumberInput({ field, value, error, onChange }: NumberInp
           required={field.required}
           min={!isCurrency && !isPercentage ? field.validation?.min : undefined}
           max={!isCurrency && !isPercentage ? field.validation?.max : undefined}
-          step={!isCurrency && !isPercentage ? (field.type === 'CURRENCY' ? '0.01' : '1') : undefined}
+          step={!isCurrency && !isPercentage ? '1' : undefined}
           className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
             getPrefix() ? 'pl-8' : ''
           } ${getSuffix() ? 'pr-8' : ''} ${

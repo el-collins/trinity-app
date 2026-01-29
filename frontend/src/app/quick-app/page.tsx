@@ -5,11 +5,24 @@ import DynamicFormContainer from '@/components/DynamicForm/DynamicFormContainer'
 import LoanTypeSelection from '@/components/LoanTypeSelection';
 import { useRouter } from 'next/navigation';
 import { useFormStore } from '@/lib/store/formStore';
+import { useReferralTracking } from '@/hooks/useReferralTracking';
 
 export default function QuickAppPage() {
   const router = useRouter();
   const { responses } = useFormStore();
   const [quickAppCompleted, setQuickAppCompleted] = useState(false);
+
+  // Capture referral tracking params from URL on page load
+  const { referralData, hasReferral } = useReferralTracking();
+
+  // Log referral data for debugging
+  if (hasReferral && referralData) {
+    console.log('[QuickApp] Referral tracking active:', {
+      referralCode: referralData.referralCode,
+      agentId: referralData.agentId,
+      utmCampaign: referralData.utmCampaign,
+    });
+  }
 
   // Check if user completed Quick App by checking for the know_loan_type response
   const handleQuickAppComplete = () => {

@@ -4,6 +4,7 @@ import { LoanTypeDefinition, FormSection } from '../types/schema';
 import { validateSection, validateField } from '../validation/schemaGenerator';
 import toast from 'react-hot-toast';
 import { encodeFormState, decodeFormState, updateURLWithToken, ShareableFormState } from '../utils/urlState';
+import { getReferralDataFromStorage } from '@/hooks/useReferralTracking';
 
 export interface FormState {
   // Form Structure
@@ -209,7 +210,7 @@ export const useFormStore = create<FormStore>()(
       submitForm: async () => {
         set({ isSubmitting: true });
         try {
-          const { responses, loanTypeId, structure } = get();
+          const { responses, loanTypeId, structure, applicationId } = get();
 
           console.log('Application response:', responses);
           
@@ -247,7 +248,10 @@ export const useFormStore = create<FormStore>()(
             return;
           }
           
-          // Submit to API
+          // Get referral data from storage
+          const referralData = getReferralDataFromStorage();
+
+          // Submit to API (will UPDATE if applicationId exists, CREATE if not)
           const response = await fetch('/api/applications', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -255,6 +259,19 @@ export const useFormStore = create<FormStore>()(
               loanTypeId,
               responses,
               submittedAt: new Date().toISOString(),
+              applicationId, // Include applicationId if resuming
+              // Include referral tracking data
+              referralData: referralData ? {
+                referralCode: referralData.referralCode,
+                agentId: referralData.agentId,
+                utmSource: referralData.utmSource,
+                utmMedium: referralData.utmMedium,
+                utmCampaign: referralData.utmCampaign,
+                utmTerm: referralData.utmTerm,
+                utmContent: referralData.utmContent,
+                landingUrl: referralData.landingUrl,
+                capturedAt: referralData.capturedAt,
+              } : null,
             }),
           });
           
@@ -263,7 +280,7 @@ export const useFormStore = create<FormStore>()(
             throw new Error(error.message || 'Submission failed');
           }
           
-          const { applicationId } = await response.json();
+          const { applicationId: submittedApplicationId } = await response.json();
 
     // Notify GHL that application is submitted
     try {
@@ -273,10 +290,10 @@ export const useFormStore = create<FormStore>()(
         body: JSON.stringify({
           // Event info
           event: 'application_submitted',
-          applicationId,
+          applicationId: submittedApplicationId,
           loanTypeId,
           submittedAt: new Date().toISOString(),
-          
+
           // Contact fields for GHL
           firstName: responses['contact_first_name'] || responses['first_name'] || '',
           lastName: responses['contact_last_name'] || responses['last_name'] || '',
@@ -288,6 +305,15 @@ export const useFormStore = create<FormStore>()(
           state: responses['state'] || responses['owner_state'] || '',
           postalCode: responses['postal_code'] || responses['owner_postal_code'] || '',
           contactSource: 'Trinity Finance Application',
+
+          // Referral tracking data for GHL
+          referralCode: referralData?.referralCode || '',
+          agentId: referralData?.agentId || '',
+          utmSource: referralData?.utmSource || '',
+          utmMedium: referralData?.utmMedium || '',
+          utmCampaign: referralData?.utmCampaign || '',
+          utmTerm: referralData?.utmTerm || '',
+          utmContent: referralData?.utmContent || '',
         }),
       });
     } catch (webhookError) {
@@ -318,7 +344,7 @@ export const useFormStore = create<FormStore>()(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          applicationId,
+          applicationId: submittedApplicationId,
           email: applicantEmail,
           loanTypeId,
         }),
@@ -361,10 +387,16 @@ export const useFormStore = create<FormStore>()(
     
     // Clear localStorage AND reset store state
     localStorage.removeItem('trinity-form-storage');
+    localStorage.removeItem('trinityiq_referral_data'); // Clear referral tracking
     set(initialState);
-    
-    // Redirect to success page
-    window.location.href = `/success?id=${applicationId}`;
+
+    // Redirect to success page with referral params for display
+    const successParams = new URLSearchParams({ id: submittedApplicationId });
+    if (referralData?.referralCode) successParams.set('ref', referralData.referralCode);
+    if (referralData?.agentId) successParams.set('agent', referralData.agentId);
+    if (referralData?.utmCampaign) successParams.set('campaign', referralData.utmCampaign);
+
+    window.location.href = `/success?${successParams.toString()}`;
         } catch (error) {
           console.error('Form submission error:', error);
           alert(error instanceof Error ? error.message : 'Failed to submit application. Please try again.');
@@ -409,6 +441,7 @@ export const useFormStore = create<FormStore>()(
 
           set({
             loanTypeId: state.loanTypeId,
+            applicationId: state.applicationId, // Set applicationId for resume tracking
             responses: state.responses || {},
             currentSectionIndex: validSectionIndex,
             completedSections: state.completedSections || [],

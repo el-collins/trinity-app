@@ -26,7 +26,15 @@ export async function POST(request: NextRequest) {
       loanTypeId: loanType,
       contactSource,
       submittedAt,
-      applicationUrl
+      applicationUrl,
+      // Referral tracking data
+      referralCode,
+      agentId,
+      utmSource,
+      utmMedium,
+      utmCampaign,
+      utmTerm,
+      utmContent,
     } = body;
 
     // console.log('Received submission payload:', JSON.stringify(body, null, 2));
@@ -62,6 +70,87 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Build custom fields array with referral tracking
+    const customFields = [
+      {
+        id: config.goHighLevel.customFields.applicationId,
+        key: 'application_id',
+        field_value: applicationId,
+      },
+      {
+        id: config.goHighLevel.customFields.applicationStatus,
+        key: 'application_status',
+        field_value: 'Submitted',
+      },
+      {
+        id: config.goHighLevel.customFields.loanType,
+        key: 'loan_type',
+        field_value: loanType,
+      },
+      {
+        id: config.goHighLevel.customFields.applicationUrl,
+        key: 'application_url',
+        field_value: resumeLink,
+      },
+      {
+        id: config.goHighLevel.customFields.submissionDate,
+        key: 'submission_date',
+        field_value: new Date().toISOString().split('T')[0],
+      },
+    ];
+
+    // Add referral tracking fields if configured and have values
+    if (referralCode && config.goHighLevel.customFields.referralCode) {
+      customFields.push({
+        id: config.goHighLevel.customFields.referralCode,
+        key: 'referral_code',
+        field_value: referralCode,
+      });
+    }
+
+    if (agentId && config.goHighLevel.customFields.agentId) {
+      customFields.push({
+        id: config.goHighLevel.customFields.agentId,
+        key: 'agent_id',
+        field_value: agentId,
+      });
+    }
+
+    if (utmSource && config.goHighLevel.customFields.utmSource) {
+      customFields.push({
+        id: config.goHighLevel.customFields.utmSource,
+        key: 'utm_source',
+        field_value: utmSource,
+      });
+    }
+
+    if (utmMedium && config.goHighLevel.customFields.utmMedium) {
+      customFields.push({
+        id: config.goHighLevel.customFields.utmMedium,
+        key: 'utm_medium',
+        field_value: utmMedium,
+      });
+    }
+
+    if (utmCampaign && config.goHighLevel.customFields.utmCampaign) {
+      customFields.push({
+        id: config.goHighLevel.customFields.utmCampaign,
+        key: 'utm_campaign',
+        field_value: utmCampaign,
+      });
+    }
+
+    // Log referral data if present
+    if (referralCode || agentId || utmCampaign) {
+      console.log('[GHL] Syncing referral tracking:', {
+        referralCode,
+        agentId,
+        utmSource,
+        utmMedium,
+        utmCampaign,
+      });
+    }
+
     // Send to GHL
     const contactId = await ghlService.createOrUpdateContact({
       firstName,
@@ -73,35 +162,9 @@ export async function POST(request: NextRequest) {
       city,
       state,
       postalCode,
-      tags: ['Application Submitted', loanType],
+      tags: ['Application Submitted', loanType, ...(referralCode ? [`Referral: ${referralCode}`] : [])],
       source: contactSource || 'Trinity Finance SmartForm',
-      customFields: [
-        {
-            id: config.goHighLevel.customFields.applicationId,
-            key: 'application_id',
-            field_value: applicationId
-        },
-        {
-            id: config.goHighLevel.customFields.applicationStatus,
-            key: 'application_status',
-            field_value: 'Submitted'
-        },
-        {
-            id: config.goHighLevel.customFields.loanType,
-            key: 'loan_type',
-            field_value: loanType
-        },
-        {
-            id: config.goHighLevel.customFields.applicationUrl,
-            key: 'application_url',
-            field_value: resumeLink
-        },
-        {
-            id: config.goHighLevel.customFields.submissionDate,
-            key: 'submission_date',
-            field_value: new Date().toISOString().split('T')[0]
-        }
-      ]
+      customFields,
     });
 
     if (!contactId) {

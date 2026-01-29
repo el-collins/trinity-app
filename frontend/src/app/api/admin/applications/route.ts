@@ -25,17 +25,13 @@ export async function GET(request: NextRequest) {
     // Order by submission date (newest first)
     query = query.orderBy('submittedAt', 'desc');
 
-    // Get total count for pagination (without limit)
-    const countSnapshot = await query.count().get();
-    const totalCount = countSnapshot.data().count;
-
-    // Apply pagination
-    const offset = (page - 1) * limit;
-    query = query.limit(limit).offset(offset);
-
+    // Get all matching documents (we'll filter deleted ones client-side)
     const snapshot = await query.get();
 
-    const applications = snapshot.docs.map(doc => {
+    // Filter out deleted applications and map to response format
+    const allApplications = snapshot.docs
+      .filter(doc => !doc.data().deleted) // Filter deleted apps client-side
+      .map(doc => {
       const data = doc.data();
 
       // Extract key information from responses for list view
@@ -64,10 +60,10 @@ export async function GET(request: NextRequest) {
     });
 
     // Apply client-side search filter if provided
-    let filteredApplications = applications;
+    let filteredApplications = allApplications;
     if (search) {
       const searchLower = search.toLowerCase();
-      filteredApplications = applications.filter(app =>
+      filteredApplications = allApplications.filter((app: any) =>
         app.businessName.toLowerCase().includes(searchLower) ||
         app.contactName.toLowerCase().includes(searchLower) ||
         app.email.toLowerCase().includes(searchLower) ||
@@ -75,8 +71,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Apply pagination client-side
+    const totalCount = filteredApplications.length;
+    const offset = (page - 1) * limit;
+    const paginatedApplications = filteredApplications.slice(offset, offset + limit);
+
     return NextResponse.json({
-      applications: filteredApplications,
+      applications: paginatedApplications,
       pagination: {
         page,
         limit,

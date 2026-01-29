@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { firestore } from '@/lib/firebase/admin';
 import ExcelJS from 'exceljs';
+import { googleSheetsService } from '@/lib/services/GoogleSheetsService';
 
 const LOAN_TYPE_LABELS: Record<string, string> = {
   mca: 'Merchant Cash Advance',
@@ -38,7 +39,10 @@ export async function GET(request: NextRequest) {
 
     const snapshot = await query.get();
 
-    const applications = snapshot.docs.map(doc => {
+    // Filter out deleted applications (same as list API)
+    const applications = snapshot.docs
+      .filter(doc => !doc.data().deleted)
+      .map(doc => {
       const data = doc.data();
       const responses = data.responses || {};
 
@@ -168,6 +172,96 @@ export async function GET(request: NextRequest) {
           'Content-Disposition': `attachment; filename="Trinity_Finance_Applications_${new Date().toISOString().split('T')[0]}.xlsx"`,
         },
       });
+    }
+
+    if (format === 'googlesheets' || format === 'gsheets') {
+      // Check if Google Sheets is configured
+      if (!googleSheetsService.isConfigured()) {
+        return NextResponse.json(
+          {
+            error: 'Google Sheets integration not configured',
+            message: 'Please configure environment variables, and enable Google Sheets API in your Google Cloud project.',
+          },
+          { status: 503 }
+        );
+      }
+
+      // Prepare data for Google Sheets
+      const headers = [
+        'Application ID',
+        'Loan Type',
+        'Status',
+        'Submitted At',
+        'Business Name',
+        'Contact First Name',
+        'Contact Last Name',
+        'Email',
+        'Phone',
+        'Requested Amount',
+        'Business Address',
+        'City',
+        'State',
+        'Zip Code',
+        'Years in Business',
+        'Annual Revenue',
+        'FICO Score',
+        'Use of Funds',
+        'Version',
+      ];
+
+      const rows = filteredApplications.map(app => [
+        app['Application ID'],
+        app['Loan Type'],
+        app['Status'],
+        app['Submitted At'],
+        app['Business Name'],
+        app['Contact First Name'],
+        app['Contact Last Name'],
+        app['Email'],
+        app['Phone'],
+        app['Requested Amount'],
+        app['Business Address'],
+        app['City'],
+        app['State'],
+        app['Zip Code'],
+        app['Years in Business'],
+        app['Annual Revenue'],
+        app['FICO Score'],
+        app['Use of Funds'],
+        app['Version'],
+      ]);
+
+      try {
+        const result = await googleSheetsService.createSpreadsheet({
+          title: `Trinity Finance Applications - ${new Date().toISOString().split('T')[0]}`,
+          headers,
+          rows,
+        });
+
+        return NextResponse.json({
+          success: true,
+          spreadsheetId: result.spreadsheetId,
+          spreadsheetUrl: result.spreadsheetUrl,
+          totalRecords: filteredApplications.length,
+        });
+      } catch (sheetsError: any) {
+        console.error('Google Sheets export error:', sheetsError);
+        console.error('Error details:', JSON.stringify({
+          code: sheetsError?.code,
+          status: sheetsError?.status,
+          message: sheetsError?.message,
+          errors: sheetsError?.errors,
+          response: sheetsError?.response?.data,
+          cause: sheetsError?.cause,
+        }, null, 2));
+        return NextResponse.json(
+          {
+            error: 'Failed to create Google Sheet',
+            message: sheetsError instanceof Error ? sheetsError.message : 'Unknown error',
+          },
+          { status: 500 }
+        );
+      }
     }
 
     if (format === 'csv') {

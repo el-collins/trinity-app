@@ -81,7 +81,7 @@ export async function GET(
   }
 }
 
-// Update application status
+// Update application (status, notes, or responses)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -89,7 +89,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { status, notes } = body;
+    const { status, notes, responses } = body;
 
     const docRef = firestore.collection('applications').doc(id);
     const docSnap = await docRef.get();
@@ -113,6 +113,13 @@ export async function PATCH(
       updates.adminNotes = notes;
     }
 
+    // Allow editing application responses (for admin corrections)
+    if (responses) {
+      updates.responses = responses;
+      updates.lastEditedBy = 'admin';
+      updates.lastEditedAt = new Date();
+    }
+
     await docRef.update(updates);
 
     return NextResponse.json({
@@ -123,6 +130,46 @@ export async function PATCH(
     console.error('Error updating application:', error);
     return NextResponse.json(
       { error: 'Failed to update application' },
+      { status: 500 }
+    );
+  }
+}
+
+// Delete application (soft delete)
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    // Get application from Firestore
+    const docRef = firestore.collection('applications').doc(id);
+    const docSnap = await docRef.get();
+
+    if (!docSnap.exists) {
+      return NextResponse.json(
+        { error: 'Application not found' },
+        { status: 404 }
+      );
+    }
+
+    // Soft delete - mark as deleted but preserve data
+    await docRef.update({
+      deleted: true,
+      deletedAt: new Date(),
+      deletedBy: 'admin',
+      updatedAt: new Date(),
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Application deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting application:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete application' },
       { status: 500 }
     );
   }
