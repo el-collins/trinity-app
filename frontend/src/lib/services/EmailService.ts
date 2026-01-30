@@ -1077,18 +1077,17 @@ This link will expire in 30 days.
         <table role="presentation" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <!-- Header -->
           <tr>
-            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #1f2937 0%, #374151 100%); border-radius: 8px 8px 0 0;">
+            <td style="padding: 40px 40px 20px; text-align: center; background-color: #ffffff; border-bottom: 2px solid #2563eb; border-radius: 8px 8px 0 0;">
               <img src="${this.getLogoUrl()}" alt="Trinity Finance Logo" style="width: 80px; height: auto; margin-bottom: 15px;" />
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
-              <p style="margin: 10px 0 0; color: #9ca3af; font-size: 14px;">Admin Portal</p>
+              <h1 style="margin: 0; color: #2563eb; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
             </td>
           </tr>
 
           <!-- Icon -->
           <tr>
             <td style="padding: 30px 40px 20px; text-align: center;">
-              <div style="display: inline-block; width: 80px; height: 80px; background-color: #3b82f6; border-radius: 50%;">
-                <span style="color: #ffffff; font-size: 36px; line-height: 80px;">&#128272;</span>
+              <div style="display: inline-block; width: 80px; height: 80px; background-color: #2563eb; border-radius: 50%; position: relative;">
+                <span style="color: #ffffff; font-size: 48px; line-height: 80px;">&#128274;</span>
               </div>
             </td>
           </tr>
@@ -1096,7 +1095,7 @@ This link will expire in 30 days.
           <!-- Main Content -->
           <tr>
             <td style="padding: 0 40px 30px;">
-              <h2 style="margin: 0 0 20px; color: #1f2937; font-size: 24px; text-align: center;">You're Invited!</h2>
+              <h2 style="margin: 0 0 20px; color: #1f2937; font-size: 24px; text-align: center;">You're Invited to Admin Portal</h2>
 
               <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
                 Dear ${data.name},
@@ -1112,7 +1111,7 @@ This link will expire in 30 days.
 
               <!-- CTA Button -->
               <div style="text-align: center; margin: 40px 0;">
-                <a href="${data.setupUrl}" style="display: inline-block; padding: 16px 40px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <a href="${data.setupUrl}" style="display: inline-block; padding: 16px 40px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                   Set Up My Password
                 </a>
               </div>
@@ -1120,6 +1119,15 @@ This link will expire in 30 days.
               <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6; text-align: center;">
                 <strong>This link will expire in 48 hours.</strong><br>
                 If you didn't expect this invitation, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Contact Section -->
+          <tr>
+            <td style="padding: 30px 40px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px; color: #6b7280; font-size: 14px; text-align: center;">
+                Questions? Contact us at <a href="mailto:iq@financetrinity.com" style="color: #2563eb; text-decoration: none;">iq@financetrinity.com</a>
               </p>
             </td>
           </tr>

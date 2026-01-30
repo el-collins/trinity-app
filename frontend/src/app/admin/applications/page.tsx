@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import toast from 'react-hot-toast';
 
 interface Application {
   id: string;
@@ -52,22 +51,7 @@ export default function ApplicationsListPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [loanTypeFilter, setLoanTypeFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [showExportMenu, setShowExportMenu] = useState(false);
-  const [isExportingGSheets, setIsExportingGSheets] = useState(false);
-  const exportMenuRef = useRef<HTMLDivElement>(null);
-
-  // Close export menu on click outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
-        setShowExportMenu(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
+  
   const fetchApplications = async () => {
     setIsLoading(true);
     setError(null);
@@ -113,37 +97,12 @@ export default function ApplicationsListPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const handleExport = async (format: 'excel' | 'googlesheets' = 'excel') => {
+  const handleExport = () => {
     const params = new URLSearchParams();
-    params.set('format', format);
+    params.set('format', 'excel');
     if (statusFilter) params.set('status', statusFilter);
     if (loanTypeFilter) params.set('loanType', loanTypeFilter);
-
-    if (format === 'googlesheets') {
-      // Google Sheets export - fetch and get the URL
-      setIsExportingGSheets(true);
-      setShowExportMenu(false);
-
-      try {
-        const response = await fetch(`/api/admin/export?${params}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message || data.error || 'Failed to create Google Sheet');
-        }
-
-        // Open the Google Sheet in a new tab
-        window.open(data.spreadsheetUrl, '_blank');
-        toast.success(`Google Sheet created with ${data.totalRecords} applications`);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Failed to create Google Sheet');
-      } finally {
-        setIsExportingGSheets(false);
-      }
-    } else {
-      // Excel export - direct download
-      window.open(`/api/admin/export?${params}`, '_blank');
-    }
+    window.open(`/api/admin/export?${params}`, '_blank');
   };
 
   const formatCurrency = (amount: number | null) => {
@@ -175,118 +134,25 @@ export default function ApplicationsListPage() {
             Manage and review loan applications
           </p>
         </div>
-        <div className="relative inline-block" ref={exportMenuRef}>
-          <button
-            onClick={() => setShowExportMenu(!showExportMenu)}
-            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+        <button
+          onClick={handleExport}
+          className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+        >
+          <svg
+            className="w-5 h-5 mr-2"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
-            <svg
-              className="w-5 h-5 mr-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-            Export
-            <svg
-              className={`w-4 h-4 ml-2 transition-transform ${showExportMenu ? 'rotate-180' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </button>
-
-          {/* Dropdown Menu */}
-          {showExportMenu && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
-              <button
-                onClick={() => {
-                  handleExport('excel');
-                  setShowExportMenu(false);
-                }}
-                className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center"
-              >
-                <svg
-                  className="w-5 h-5 mr-3 text-green-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                <div>
-                  <p className="font-medium">Excel (.xlsx)</p>
-                  <p className="text-xs text-gray-500">Formatted spreadsheet</p>
-                </div>
-              </button>
-              <button
-                onClick={() => handleExport('googlesheets')}
-                disabled={isExportingGSheets}
-                className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isExportingGSheets ? (
-                  <svg
-                    className="animate-spin w-5 h-5 mr-3 text-green-600"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                ) : (
-                  <svg
-                    className="w-5 h-5 mr-3"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
-                    <path
-                      d="M19.5 3H4.5C3.67 3 3 3.67 3 4.5v15c0 .83.67 1.5 1.5 1.5h15c.83 0 1.5-.67 1.5-1.5v-15c0-.83-.67-1.5-1.5-1.5z"
-                      fill="#0F9D58"
-                    />
-                    <path d="M7.5 7.5h9v2h-9zM7.5 11h9v2h-9zM7.5 14.5h6v2h-6z" fill="white" />
-                  </svg>
-                )}
-                <div>
-                  <p className="font-medium">
-                    {isExportingGSheets ? 'Creating...' : 'Google Sheets'}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {isExportingGSheets ? 'Please wait' : 'Opens in new tab'}
-                  </p>
-                </div>
-              </button>
-            </div>
-          )}
-        </div>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+          </svg>
+          Export Excel
+        </button>
       </div>
 
       {/* Filters */}

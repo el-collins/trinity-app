@@ -10,27 +10,26 @@ export async function GET(request: NextRequest) {
     const loanType = searchParams.get('loanType');
     const search = searchParams.get('search');
 
-    // Build query
-    let query: FirebaseFirestore.Query = firestore.collection('applications');
+    // Build query - we fetch all and filter/sort client-side to avoid composite index requirements
+    const query: FirebaseFirestore.Query = firestore.collection('applications');
 
-    // Apply filters
-    if (status) {
-      query = query.where('status', '==', status);
-    }
-
-    if (loanType) {
-      query = query.where('loanTypeId', '==', loanType);
-    }
-
-    // Order by submission date (newest first)
-    query = query.orderBy('submittedAt', 'desc');
-
-    // Get all matching documents (we'll filter deleted ones client-side)
+    // Get all documents
     const snapshot = await query.get();
 
-    // Filter out deleted applications and map to response format
+    // Filter and map to response format
     const allApplications = snapshot.docs
-      .filter(doc => !doc.data().deleted) // Filter deleted apps client-side
+      .filter(doc => {
+        const data = doc.data();
+        // Filter out deleted applications
+        if (data.deleted) return false;
+        // Filter out drafts and in-progress - only show submitted applications
+        if (!data.status || data.status === 'draft' || data.status === 'in_progress') return false;
+        // Apply status filter
+        if (status && data.status !== status) return false;
+        // Apply loan type filter
+        if (loanType && data.loanTypeId !== loanType) return false;
+        return true;
+      })
       .map(doc => {
       const data = doc.data();
 
@@ -57,6 +56,12 @@ export async function GET(request: NextRequest) {
         phone,
         requestedAmount,
       };
+    })
+    // Sort by submission date (newest first)
+    .sort((a, b) => {
+      const dateA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+      const dateB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+      return dateB - dateA;
     });
 
     // Apply client-side search filter if provided

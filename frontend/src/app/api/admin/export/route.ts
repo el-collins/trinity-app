@@ -39,34 +39,68 @@ export async function GET(request: NextRequest) {
 
     const snapshot = await query.get();
 
-    // Filter out deleted applications (same as list API)
-    const applications = snapshot.docs
-      .filter(doc => !doc.data().deleted)
-      .map(doc => {
+    // Filter out deleted applications and drafts (same as list API)
+    const filteredDocs = snapshot.docs.filter(doc => {
+      const data = doc.data();
+      // Filter out deleted applications
+      if (data.deleted) return false;
+      // Filter out drafts and in-progress - only export submitted applications
+      if (!data.status || data.status === 'draft' || data.status === 'in_progress') return false;
+      return true;
+    });
+
+    // Collect all unique response field keys from all applications
+    const allResponseKeys = new Set<string>();
+    filteredDocs.forEach(doc => {
+      const responses = doc.data().responses || {};
+      Object.keys(responses).forEach(key => {
+        // Skip signature images (base64 data)
+        const value = responses[key];
+        if (typeof value === 'string' && value.startsWith('data:image')) return;
+        allResponseKeys.add(key);
+      });
+    });
+
+    // Convert field keys to readable labels
+    const formatFieldLabel = (key: string): string => {
+      return key
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    };
+
+    // Sort response keys alphabetically for consistent column order
+    const sortedResponseKeys = Array.from(allResponseKeys).sort();
+
+    // Map applications with all fields
+    const applications = filteredDocs.map(doc => {
       const data = doc.data();
       const responses = data.responses || {};
 
-      return {
+      // Start with fixed fields
+      const row: Record<string, any> = {
         'Application ID': doc.id,
         'Loan Type': LOAN_TYPE_LABELS[data.loanTypeId] || data.loanTypeId || '',
         'Status': (data.status || 'submitted').replace('_', ' ').toUpperCase(),
         'Submitted At': data.submittedAt || '',
-        'Business Name': responses.business_name || responses.legal_business_name || '',
-        'Contact First Name': responses.first_name || responses.contact_first_name || '',
-        'Contact Last Name': responses.last_name || responses.contact_last_name || '',
-        'Email': data.applicantEmail || responses.business_email || responses.email || '',
-        'Phone': responses.business_phone || responses.phone || responses.mobile_phone || '',
-        'Requested Amount': responses.requested_amount || responses.loan_amount || responses.desired_funding_amount || '',
-        'Business Address': responses.business_address || '',
-        'City': responses.city || '',
-        'State': responses.state || '',
-        'Zip Code': responses.zip_code || '',
-        'Years in Business': responses.years_in_business || '',
-        'Annual Revenue': responses.annual_revenue || responses.gross_annual_revenue || '',
-        'FICO Score': responses.fico_score || responses.credit_score || '',
-        'Use of Funds': responses.use_of_funds || responses.funding_purpose || '',
+        'Applicant Email': data.applicantEmail || '',
         'Version': data.version || 1,
       };
+
+      // Add all response fields dynamically
+      sortedResponseKeys.forEach(key => {
+        const label = formatFieldLabel(key);
+        let value = responses[key];
+
+        // Format boolean values
+        if (typeof value === 'boolean') {
+          value = value ? 'Yes' : 'No';
+        }
+
+        row[label] = value ?? '';
+      });
+
+      return row;
     });
 
     // Filter by date if provided
@@ -90,28 +124,16 @@ export async function GET(request: NextRequest) {
         views: [{ state: 'frozen', xSplit: 0, ySplit: 1 }], // Freeze header row
       });
 
-      // Define columns with headers and widths
-      const columns = [
-        { header: 'Application ID', key: 'Application ID', width: 25 },
-        { header: 'Loan Type', key: 'Loan Type', width: 25 },
-        { header: 'Status', key: 'Status', width: 15 },
-        { header: 'Submitted At', key: 'Submitted At', width: 20 },
-        { header: 'Business Name', key: 'Business Name', width: 30 },
-        { header: 'Contact First Name', key: 'Contact First Name', width: 18 },
-        { header: 'Contact Last Name', key: 'Contact Last Name', width: 18 },
-        { header: 'Email', key: 'Email', width: 30 },
-        { header: 'Phone', key: 'Phone', width: 18 },
-        { header: 'Requested Amount', key: 'Requested Amount', width: 18 },
-        { header: 'Business Address', key: 'Business Address', width: 35 },
-        { header: 'City', key: 'City', width: 15 },
-        { header: 'State', key: 'State', width: 10 },
-        { header: 'Zip Code', key: 'Zip Code', width: 12 },
-        { header: 'Years in Business', key: 'Years in Business', width: 18 },
-        { header: 'Annual Revenue', key: 'Annual Revenue', width: 18 },
-        { header: 'FICO Score', key: 'FICO Score', width: 12 },
-        { header: 'Use of Funds', key: 'Use of Funds', width: 30 },
-        { header: 'Version', key: 'Version', width: 10 },
-      ];
+      // Dynamically generate columns from the first application's keys
+      const allKeys = filteredApplications.length > 0
+        ? Object.keys(filteredApplications[0])
+        : ['Application ID', 'Loan Type', 'Status', 'Submitted At', 'Applicant Email', 'Version'];
+
+      const columns = allKeys.map(key => ({
+        header: key,
+        key: key,
+        width: key.length < 15 ? 18 : Math.min(key.length + 5, 35),
+      }));
 
       worksheet.columns = columns;
 
@@ -139,16 +161,15 @@ export async function GET(request: NextRequest) {
           };
         }
 
-        // Format currency columns
-        const amountCell = row.getCell('Requested Amount');
-        if (amountCell.value && typeof amountCell.value === 'number') {
-          amountCell.numFmt = '$#,##0';
-        }
-
-        const revenueCell = row.getCell('Annual Revenue');
-        if (revenueCell.value && typeof revenueCell.value === 'number') {
-          revenueCell.numFmt = '$#,##0';
-        }
+        // Format currency columns (any column with amount, revenue, funding, etc.)
+        row.eachCell((cell, colNumber) => {
+          if (cell.value && typeof cell.value === 'number') {
+            const header = allKeys[colNumber - 1]?.toLowerCase() || '';
+            if (header.includes('amount') || header.includes('revenue') || header.includes('funding') || header.includes('salary') || header.includes('income')) {
+              cell.numFmt = '$#,##0';
+            }
+          }
+        });
       });
 
       // Add borders to all cells
@@ -186,50 +207,14 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      // Prepare data for Google Sheets
-      const headers = [
-        'Application ID',
-        'Loan Type',
-        'Status',
-        'Submitted At',
-        'Business Name',
-        'Contact First Name',
-        'Contact Last Name',
-        'Email',
-        'Phone',
-        'Requested Amount',
-        'Business Address',
-        'City',
-        'State',
-        'Zip Code',
-        'Years in Business',
-        'Annual Revenue',
-        'FICO Score',
-        'Use of Funds',
-        'Version',
-      ];
+      // Prepare data for Google Sheets - dynamically from application keys
+      const headers = filteredApplications.length > 0
+        ? Object.keys(filteredApplications[0])
+        : ['Application ID', 'Loan Type', 'Status', 'Submitted At', 'Applicant Email', 'Version'];
 
-      const rows = filteredApplications.map(app => [
-        app['Application ID'],
-        app['Loan Type'],
-        app['Status'],
-        app['Submitted At'],
-        app['Business Name'],
-        app['Contact First Name'],
-        app['Contact Last Name'],
-        app['Email'],
-        app['Phone'],
-        app['Requested Amount'],
-        app['Business Address'],
-        app['City'],
-        app['State'],
-        app['Zip Code'],
-        app['Years in Business'],
-        app['Annual Revenue'],
-        app['FICO Score'],
-        app['Use of Funds'],
-        app['Version'],
-      ]);
+      const rows = filteredApplications.map(app =>
+        headers.map(header => app[header as keyof typeof app] ?? '')
+      );
 
       try {
         const result = await googleSheetsService.createSpreadsheet({

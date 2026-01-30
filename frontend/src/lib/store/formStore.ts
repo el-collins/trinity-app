@@ -111,12 +111,14 @@ export const useFormStore = create<FormStore>()(
           set({ completedSections: [...completedSections, sectionId] });
 
           // Sync contact to GHL when any contact section is completed
-          const isContactSection = ['quick_app_contact', 'contact_info', 'daily_contact'].includes(sectionId);
+          const isContactSection = ['quick_app_contact', 'contact_info', 'daily_contact', 'owner_info', 'business_info'].includes(sectionId);
 
           if (isContactSection) {
-            // Get contact data from responses
-            const email = responses['email'] || responses['business_email'] || '';
-            const phone = responses['phone'] || responses['business_phone'] || responses['mobile_phone'] || '';
+            // Get contact data from responses - use comprehensive field name lookups
+            const email = responses['business_email'] || responses['owner_email'] || responses['email'] || responses['contact_email'] || '';
+            const phone = responses['mobile_phone'] || responses['business_phone'] || responses['phone'] || responses['owner_phone'] || '';
+            const firstName = responses['contact_first_name'] || responses['first_name'] || responses['owner_first_name'] || '';
+            const lastName = responses['contact_last_name'] || responses['last_name'] || responses['owner_last_name'] || '';
 
             // Only sync if we have at least email or phone
             if (email || phone) {
@@ -125,8 +127,8 @@ export const useFormStore = create<FormStore>()(
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    firstName: responses['first_name'] || '',
-                    lastName: responses['last_name'] || '',
+                    firstName,
+                    lastName,
                     email,
                     phone,
                     applicationId,
@@ -135,7 +137,7 @@ export const useFormStore = create<FormStore>()(
                 });
 
                 if (response.ok) {
-                  toast.success('Contact synced to GHL');
+                  console.log('Contact synced to GHL:', { firstName, lastName, email, phone });
                 }
               } catch (error) {
                 console.error('GHL sync failed:', error);
