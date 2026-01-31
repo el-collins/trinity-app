@@ -51,13 +51,25 @@ export async function GET(request: NextRequest) {
 
     // Collect all unique response field keys from all applications
     const allResponseKeys = new Set<string>();
+    // Collect all unique document keys from all applications
+    const allDocumentKeys = new Set<string>();
+
     filteredDocs.forEach(doc => {
-      const responses = doc.data().responses || {};
+      const data = doc.data();
+      const responses = data.responses || {};
+      const documents = data.documents || {};
+
+      // Collect response keys
       Object.keys(responses).forEach(key => {
         // Skip signature images (base64 data)
         const value = responses[key];
         if (typeof value === 'string' && value.startsWith('data:image')) return;
         allResponseKeys.add(key);
+      });
+
+      // Collect document keys
+      Object.keys(documents).forEach(key => {
+        allDocumentKeys.add(key);
       });
     });
 
@@ -71,11 +83,14 @@ export async function GET(request: NextRequest) {
 
     // Sort response keys alphabetically for consistent column order
     const sortedResponseKeys = Array.from(allResponseKeys).sort();
+    // Sort document keys alphabetically
+    const sortedDocumentKeys = Array.from(allDocumentKeys).sort();
 
     // Map applications with all fields
     const applications = filteredDocs.map(doc => {
       const data = doc.data();
       const responses = data.responses || {};
+      const documents = data.documents || {};
 
       // Start with fixed fields
       const row: Record<string, any> = {
@@ -98,6 +113,13 @@ export async function GET(request: NextRequest) {
         }
 
         row[label] = value ?? '';
+      });
+
+      // Add all document URLs dynamically
+      sortedDocumentKeys.forEach(key => {
+        const label = `Doc: ${formatFieldLabel(key)}`;
+        const docData = documents[key];
+        row[label] = docData?.url || '';
       });
 
       return row;
