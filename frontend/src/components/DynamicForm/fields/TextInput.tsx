@@ -14,9 +14,9 @@ export default function TextInput({ field, value, error, onChange, onBlur }: Tex
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
     const fieldType = field.type.toUpperCase();
-    
-    // For SSN and EIN, store only digits (formatting is for display only)
-    if (fieldType === 'SSN' || fieldType === 'EIN') {
+
+    // For SSN, EIN, and PHONE, store only digits (formatting is for display only)
+    if (fieldType === 'SSN' || fieldType === 'EIN' || fieldType === 'PHONE') {
       const digits = rawValue.replace(/\D/g, '');
       onChange(digits);
     } else {
@@ -39,10 +39,10 @@ export default function TextInput({ field, value, error, onChange, onBlur }: Tex
     }
   };
 
-  // Format SSN/EIN as user types
+  // Format SSN/EIN/PHONE as user types
   const formatValue = (val: string) => {
     const fieldType = field.type.toUpperCase();
-    
+
     if (fieldType === 'SSN') {
       // Format: XXX-XX-XXXX
       const digits = val.replace(/\D/g, '').slice(0, 9);
@@ -50,14 +50,22 @@ export default function TextInput({ field, value, error, onChange, onBlur }: Tex
       if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
       return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
     }
-    
+
     if (fieldType === 'EIN') {
       // Format: XX-XXXXXXX
       const digits = val.replace(/\D/g, '').slice(0, 9);
       if (digits.length <= 2) return digits;
       return `${digits.slice(0, 2)}-${digits.slice(2)}`;
     }
-    
+
+    if (fieldType === 'PHONE') {
+      // Format: (XXX) XXX-XXXX
+      const digits = val.replace(/\D/g, '').slice(0, 10);
+      if (digits.length <= 3) return digits;
+      if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+
     return val;
   };
 
@@ -81,7 +89,7 @@ export default function TextInput({ field, value, error, onChange, onBlur }: Tex
         value={displayValue}
         onChange={handleChange}
         onBlur={onBlur}
-        placeholder={field.placeholder || (field.type.toUpperCase() === 'SSN' ? 'XXX-XX-XXXX' : field.type.toUpperCase() === 'EIN' ? 'XX-XXXXXXX' : field.type.toUpperCase() === 'URL' ? 'https://example.com' : '')}
+        placeholder={field.placeholder || (field.type.toUpperCase() === 'SSN' ? 'XXX-XX-XXXX' : field.type.toUpperCase() === 'EIN' ? 'XX-XXXXXXX' : field.type.toUpperCase() === 'PHONE' ? '(XXX) XXX-XXXX' : field.type.toUpperCase() === 'URL' ? 'https://example.com' : '')}
         required={field.required}
         className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
           error

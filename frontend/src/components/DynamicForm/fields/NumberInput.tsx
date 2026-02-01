@@ -24,6 +24,15 @@ export default function NumberInput({ field, value, error, onChange }: NumberInp
   const isCurrency = fieldType === 'currency' || (fieldType === 'number' && isCurrencyByName);
   const isPercentage = fieldType === 'percentage';
 
+  // Detect ownership percentage fields (should be locked between 0-100)
+  const isOwnershipPercentage = fieldName.includes('ownership') && (fieldName.includes('percent') || isPercentage);
+
+  // Detect fields that should never be negative (lease terms, years, months, etc.)
+  const nonNegativeKeywords = ['lease', 'term', 'year', 'month', 'age', 'count', 'number', 'quantity', 'employees', 'owners'];
+  const isNonNegativeField = isCurrency || isPercentage || nonNegativeKeywords.some(keyword =>
+    fieldName.includes(keyword) || fieldLabel.includes(keyword)
+  );
+
   // Track the display value separately for formatted input
   const [displayValue, setDisplayValue] = useState('');
 
@@ -74,12 +83,30 @@ export default function NumberInput({ field, value, error, onChange }: NumberInp
       setDisplayValue(sanitized);
 
       // Parse and send the numeric value
-      const numValue = parseFormattedValue(sanitized);
+      let numValue = parseFormattedValue(sanitized);
+
+      // Hard lock ownership percentage between 0-100
+      if (isOwnershipPercentage) {
+        numValue = Math.max(0, Math.min(100, numValue));
+      }
+      // Prevent negative values for non-negative fields (lease terms, years, etc.)
+      else if (isNonNegativeField && numValue < 0) {
+        numValue = 0;
+      }
+
       onChange(numValue);
     } else {
       // Standard number handling
-      const numValue = parseFloat(val);
+      let numValue = parseFloat(val);
       if (!isNaN(numValue)) {
+        // Hard lock ownership percentage between 0-100
+        if (isOwnershipPercentage) {
+          numValue = Math.max(0, Math.min(100, numValue));
+        }
+        // Prevent negative values for non-negative fields (lease terms, years, etc.)
+        else if (isNonNegativeField && numValue < 0) {
+          numValue = 0;
+        }
         onChange(numValue);
       }
     }
@@ -143,8 +170,8 @@ export default function NumberInput({ field, value, error, onChange }: NumberInp
           onBlur={handleBlur}
           placeholder={field.placeholder || (isCurrency ? '0' : isPercentage ? '0' : '')}
           required={field.required}
-          min={!isCurrency && !isPercentage ? field.validation?.min : undefined}
-          max={!isCurrency && !isPercentage ? field.validation?.max : undefined}
+          min={isOwnershipPercentage ? 0 : isNonNegativeField ? 0 : (!isCurrency && !isPercentage ? field.validation?.min : undefined)}
+          max={isOwnershipPercentage ? 100 : (!isCurrency && !isPercentage ? field.validation?.max : undefined)}
           step={!isCurrency && !isPercentage ? '1' : undefined}
           className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
             getPrefix() ? 'pl-8' : ''

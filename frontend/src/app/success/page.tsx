@@ -170,7 +170,7 @@ function SuccessContent() {
               <div>
                 <span className="text-gray-600 text-sm">Status:</span>
                 <p className="text-gray-900 font-medium capitalize">
-                  {application.status.replace('_', ' ')}
+                  {(application.status || 'pending').replace('_', ' ')}
                 </p>
               </div>
             </>

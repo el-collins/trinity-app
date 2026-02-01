@@ -7,6 +7,7 @@ import ReviewPage from './ReviewPage';
 import SaveAndExitModal from '../Modals/SaveAndExitModal';
 import { getResumeTokenFromURL } from '@/lib/utils/urlState';
 import { applyDerivations, FieldDerivation } from '@/lib/utils/fieldDerivations';
+import { validateSection } from '@/lib/validation/schemaGenerator';
 
 // Auto-save status type
 type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -34,6 +35,7 @@ export default function DynamicFormContainer({
     setLoanTypeId,
     setLoading,
     setFieldValue,
+    setFieldError,
     nextSection,
     previousSection,
     goToSection,
@@ -74,10 +76,9 @@ export default function DynamicFormContainer({
       } else if (isComingFromQuickApp) {
         console.log('Coming from Quick App, preserving responses for data reuse');
         setIsFromQuickApp(true);
-        // Reset section index to start from the beginning of the full application
-        goToSection(0);
         // Clear completed sections since this is a new application type
         useFormStore.setState({ completedSections: [] });
+        // Note: We'll skip to the appropriate section after structure is loaded (below)
       }
 
       setLoading(true);
@@ -135,6 +136,29 @@ export default function DynamicFormContainer({
             console.error('Failed to apply field derivations:', error);
             // Don't block form loading if derivations fail
           }
+
+          // Skip contact section since it was already filled in Quick App
+          // Find the first non-contact section and start there
+          const contactSectionIds = ['contact', 'contact_info', 'quick_app_contact'];
+          const firstNonContactIndex = transformedData.sections.findIndex(
+            (section: { id: string }) => !contactSectionIds.includes(section.id)
+          );
+
+          if (firstNonContactIndex > 0) {
+            console.log(`Skipping contact section, starting at section index: ${firstNonContactIndex}`);
+            // Mark contact section as complete since data is already filled
+            const contactSection = transformedData.sections[0];
+            if (contactSection && contactSectionIds.includes(contactSection.id)) {
+              markSectionComplete(contactSection.id);
+            }
+            goToSection(firstNonContactIndex);
+          } else {
+            // No contact section to skip, start at beginning
+            goToSection(0);
+          }
+        } else {
+          // Not coming from Quick App, start at beginning
+          goToSection(0);
         }
 
         // AFTER structure is loaded, load resume token if present
@@ -296,6 +320,32 @@ export default function DynamicFormContainer({
 
   // AI-powered navigation handler
   const handleNextSection = async () => {
+    // Validate required fields in current section before proceeding
+    const visibleFields = currentSection.fields.filter(field => {
+      // Check if field should be visible based on conditional logic
+      if (field.showIf && field.showIf.field && field.showIf.value) {
+        const conditionValue = responses[field.showIf.field];
+        return conditionValue === field.showIf.value;
+      }
+      return true;
+    });
+
+    const sectionToValidate = { ...currentSection, fields: visibleFields };
+    const validationErrors = validateSection(sectionToValidate, responses);
+
+    if (Object.keys(validationErrors).length > 0) {
+      // Set errors for all invalid fields
+      Object.entries(validationErrors).forEach(([fieldId, errorMsg]) => {
+        setFieldError(fieldId, errorMsg);
+      });
+      // Scroll to first error
+      const firstErrorField = document.querySelector('[class*="border-red-500"]');
+      if (firstErrorField) {
+        firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return; // Don't proceed to next section
+    }
+
     // Mark current section as complete and sync to GHL if applicable
     await markSectionComplete(currentSection.id);
 

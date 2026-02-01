@@ -3,7 +3,7 @@
 import { FormField } from '@/lib/types/schema';
 import ReactDatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface DatePickerProps {
   field: FormField;
@@ -28,7 +28,31 @@ export default function DatePicker({ field, value, error, onChange }: DatePicker
     }
   };
 
-  const [selectedDate, setSelectedDate] = useState<Date | null>(parseDate(value));
+  // Detect signature date fields that should auto-fill with today's date
+  const fieldName = (field.name || field.id || '').toLowerCase();
+  const fieldLabel = (field.label || '').toLowerCase();
+  const isSignatureDate = fieldName.includes('signature') && fieldName.includes('date') ||
+    fieldLabel.includes('signature') && fieldLabel.includes('date') ||
+    fieldName === 'date_signed' || fieldName === 'signing_date' ||
+    fieldName.includes('authorization') && fieldName.includes('date');
+
+  // Auto-fill signature date with today's date if empty
+  const getInitialDate = (): Date | null => {
+    if (value) return parseDate(value);
+    if (isSignatureDate) return new Date();
+    return null;
+  };
+
+  const [selectedDate, setSelectedDate] = useState<Date | null>(getInitialDate());
+
+  // Auto-fill signature date on mount if empty
+  useEffect(() => {
+    if (isSignatureDate && !value) {
+      const today = new Date();
+      const formatted = today.toLocaleDateString('en-US');
+      onChange(formatted);
+    }
+  }, [isSignatureDate, value, onChange]);
 
   const handleChange = (date: Date | null) => {
     setSelectedDate(date);

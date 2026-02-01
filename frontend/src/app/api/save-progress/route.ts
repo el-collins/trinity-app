@@ -62,6 +62,10 @@ export async function POST(request: NextRequest) {
       used: false,
     });
 
+    // const host = request.headers.get('host');
+    // const protocol = request.headers.get('x-forwarded-proto') || 'http';
+
+    // const resumeLink = `${protocol}://${host}/apply/${loanTypeId}?resume=${token}`;
     const resumeLink = `${new URL(request.url).origin}/apply/${loanTypeId}?resume=${token}`;
 
     // 3. Sync to GHL (update application_url)
