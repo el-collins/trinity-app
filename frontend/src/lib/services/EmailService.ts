@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import { config } from '../config';
+import { firestore } from '../firebase/admin';
 
 /**
  * Email Service using Nodemailer with SMTP
@@ -11,6 +12,28 @@ class EmailService {
 
   constructor() {
     this.initializeTransporter();
+  }
+
+  /**
+   * Fetch admin emails from Firestore adminUsers collection
+   */
+  private async getAdminEmails(): Promise<string[]> {
+    try {
+      const snapshot = await firestore.collection('adminUsers').get();
+      const emails = snapshot.docs
+        .map(doc => doc.data().email as string)
+        .filter(email => !!email);
+
+      if (emails.length === 0) {
+        console.warn('No admin emails found in Firestore, falling back to config');
+        return config.notifications.teamEmails;
+      }
+
+      return emails;
+    } catch (error) {
+      console.error('Failed to fetch admin emails from Firestore, falling back to config:', error);
+      return config.notifications.teamEmails;
+    }
   }
 
   /**
@@ -131,8 +154,7 @@ class EmailService {
     try {
       const fromName = process.env.EMAIL_FROM_NAME || 'Trinity Finance';
       const fromEmail = process.env.EMAIL_USER || 'noreply@financetrinity.com';
-      // Use configurable team emails
-      const teamEmails = config.notifications.teamEmails;
+      const teamEmails = await this.getAdminEmails();
 
       const mailOptions = {
         from: `"${fromName}" <${fromEmail}>`,
@@ -184,7 +206,7 @@ class EmailService {
     try {
       const fromName = process.env.EMAIL_FROM_NAME || 'Trinity Finance';
       const fromEmail = process.env.EMAIL_USER || 'noreply@financetrinity.com';
-      const teamEmails = config.notifications.teamEmails;
+      const teamEmails = await this.getAdminEmails();
 
       const mailOptions = {
         from: `"${fromName}" <${fromEmail}>`,
@@ -1167,6 +1189,168 @@ ${data.setupUrl}
 This link will expire in 48 hours.
 
 If you didn't expect this invitation, you can safely ignore this email.
+
+© ${new Date().getFullYear()} Trinity Finance. All rights reserved.
+    `.trim();
+  }
+
+  /**
+   * Send password reset email to admin
+   */
+  async sendPasswordResetEmail(
+    recipientEmail: string,
+    data: {
+      name: string;
+      resetUrl: string;
+    }
+  ): Promise<boolean> {
+    if (!this.transporter) {
+      console.error('Email service not initialized. Cannot send email.');
+      return false;
+    }
+
+    try {
+      const fromName = process.env.EMAIL_FROM_NAME || 'Trinity Finance';
+      const fromEmail = process.env.EMAIL_USER || 'noreply@financetrinity.com';
+
+      const mailOptions = {
+        from: `"${fromName}" <${fromEmail}>`,
+        to: recipientEmail,
+        subject: 'Reset Your Password - Trinity Finance Admin',
+        html: this.getPasswordResetHTML(data),
+        text: this.getPasswordResetText(data),
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+
+      console.log('Password reset email sent successfully:', {
+        messageId: info.messageId,
+        recipient: recipientEmail,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to send password reset email:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Generate HTML email for password reset
+   */
+  private getPasswordResetHTML(data: { name: string; resetUrl: string }): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Your Password</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 0; text-align: center;">
+        <table role="presentation" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; background-color: #ffffff; border-bottom: 2px solid #2563eb; border-radius: 8px 8px 0 0;">
+              <img src="${this.getLogoUrl()}" alt="Trinity Finance Logo" style="width: 80px; height: auto; margin-bottom: 15px;" />
+              <h1 style="margin: 0; color: #2563eb; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
+            </td>
+          </tr>
+
+          <!-- Icon -->
+          <tr>
+            <td style="padding: 30px 40px 20px; text-align: center;">
+              <div style="display: inline-block; width: 80px; height: 80px; background-color: #f59e0b; border-radius: 50%; position: relative;">
+                <span style="color: #ffffff; font-size: 48px; line-height: 80px;">&#128273;</span>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 0 40px 30px;">
+              <h2 style="margin: 0 0 20px; color: #1f2937; font-size: 24px; text-align: center;">Reset Your Password</h2>
+
+              <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Dear ${data.name},
+              </p>
+
+              <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                We received a request to reset your password for the Trinity Finance Admin Portal. Click the button below to create a new password.
+              </p>
+
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 40px 0;">
+                <a href="${data.resetUrl}" style="display: inline-block; padding: 16px 40px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                  Reset My Password
+                </a>
+              </div>
+
+              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6; text-align: center;">
+                <strong>This link will expire in 1 hour.</strong><br>
+                If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Security Notice -->
+          <tr>
+            <td style="padding: 20px 40px; background-color: #fef3c7; border-top: 1px solid #fbbf24;">
+              <p style="margin: 0; color: #92400e; font-size: 14px; text-align: center;">
+                <strong>Security Tip:</strong> Never share this link with anyone. Trinity Finance will never ask for your password via email.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Contact Section -->
+          <tr>
+            <td style="padding: 30px 40px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px; color: #6b7280; font-size: 14px; text-align: center;">
+                Questions? Contact us at <a href="mailto:iq@financetrinity.com" style="color: #2563eb; text-decoration: none;">iq@financetrinity.com</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 40px; text-align: center; background-color: #1f2937; border-radius: 0 0 8px 8px;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                &copy; ${new Date().getFullYear()} Trinity Finance. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+  }
+
+  /**
+   * Generate plain text email for password reset
+   */
+  private getPasswordResetText(data: { name: string; resetUrl: string }): string {
+    return `
+TRINITY FINANCE - Reset Your Password
+
+Dear ${data.name},
+
+We received a request to reset your password for the Trinity Finance Admin Portal.
+
+RESET YOUR PASSWORD
+-------------------
+${data.resetUrl}
+
+This link will expire in 1 hour.
+
+If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
+
+Security Tip: Never share this link with anyone. Trinity Finance will never ask for your password via email.
 
 © ${new Date().getFullYear()} Trinity Finance. All rights reserved.
     `.trim();
