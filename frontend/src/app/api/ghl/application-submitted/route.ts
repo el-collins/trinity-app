@@ -39,10 +39,21 @@ export async function POST(request: NextRequest) {
 
     // console.log('Received submission payload:', JSON.stringify(body, null, 2));
 
-    // Validate email presence
-    if (!email) {
-        console.warn('Missing email in submission payload');
-        // We might want to look for other common email fields in the body just in case the mapping failed upstream
+    // Validate required contact info - don't create empty contacts in GHL
+    if (!email && !phone) {
+      console.warn('Missing email and phone in submission payload, skipping GHL sync');
+      return NextResponse.json(
+        { success: false, message: 'Email or phone required for GHL sync' },
+        { status: 400 }
+      );
+    }
+
+    if (!firstName?.trim()) {
+      console.warn('Missing first name in submission payload, skipping GHL sync');
+      return NextResponse.json(
+        { success: false, message: 'First name required for GHL sync' },
+        { status: 400 }
+      );
     }
 
     // Generate resume token and link for the submitted application

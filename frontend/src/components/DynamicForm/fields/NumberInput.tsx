@@ -25,13 +25,25 @@ export default function NumberInput({ field, value, error, onChange }: NumberInp
   const isPercentage = fieldType === 'percentage';
 
   // Detect ownership percentage fields (should be locked between 0-100)
-  const isOwnershipPercentage = fieldName.includes('ownership') && (fieldName.includes('percent') || isPercentage);
+  // Match any field that contains both "ownership" and any variation of "percent"/"percentage"
+  // OR is a percentage type field that mentions ownership
+  const isOwnershipPercentage =
+    (fieldName.includes('ownership') && (fieldName.includes('percent') || fieldLabel.includes('percent'))) ||
+    (isPercentage && (fieldName.includes('ownership') || fieldLabel.includes('ownership')));
 
-  // Detect fields that should never be negative (lease terms, years, months, etc.)
-  const nonNegativeKeywords = ['lease', 'term', 'year', 'month', 'age', 'count', 'number', 'quantity', 'employees', 'owners'];
-  const isNonNegativeField = isCurrency || isPercentage || nonNegativeKeywords.some(keyword =>
-    fieldName.includes(keyword) || fieldLabel.includes(keyword)
-  );
+  // By default, all number fields should be non-negative (min=0) unless explicitly configured otherwise
+  // Only allow negative if field validation explicitly sets a negative min value
+  const hasExplicitNegativeMin = field.validation &&
+    Array.isArray(field.validation) &&
+    field.validation.some((rule: string) => {
+      if (typeof rule === 'string' && rule.startsWith('min:')) {
+        const minValue = parseInt(rule.split(':')[1]);
+        return minValue < 0;
+      }
+      return false;
+    });
+
+  const isNonNegativeField = !hasExplicitNegativeMin; // All fields are non-negative by default
 
   // Track the display value separately for formatted input
   const [displayValue, setDisplayValue] = useState('');
@@ -89,7 +101,7 @@ export default function NumberInput({ field, value, error, onChange }: NumberInp
       if (isOwnershipPercentage) {
         numValue = Math.max(0, Math.min(100, numValue));
       }
-      // Prevent negative values for non-negative fields (lease terms, years, etc.)
+      // Prevent negative values for all fields by default (unless explicitly allowed)
       else if (isNonNegativeField && numValue < 0) {
         numValue = 0;
       }
@@ -103,7 +115,7 @@ export default function NumberInput({ field, value, error, onChange }: NumberInp
         if (isOwnershipPercentage) {
           numValue = Math.max(0, Math.min(100, numValue));
         }
-        // Prevent negative values for non-negative fields (lease terms, years, etc.)
+        // Prevent negative values for all fields by default (unless explicitly allowed)
         else if (isNonNegativeField && numValue < 0) {
           numValue = 0;
         }
@@ -170,8 +182,8 @@ export default function NumberInput({ field, value, error, onChange }: NumberInp
           onBlur={handleBlur}
           placeholder={field.placeholder || (isCurrency ? '0' : isPercentage ? '0' : '')}
           required={field.required}
-          min={isOwnershipPercentage ? 0 : isNonNegativeField ? 0 : (!isCurrency && !isPercentage ? field.validation?.min : undefined)}
-          max={isOwnershipPercentage ? 100 : (!isCurrency && !isPercentage ? field.validation?.max : undefined)}
+          min={isOwnershipPercentage ? 0 : isNonNegativeField ? 0 : undefined}
+          max={isOwnershipPercentage ? 100 : undefined}
           step={!isCurrency && !isPercentage ? '1' : undefined}
           className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
             getPrefix() ? 'pl-8' : ''

@@ -120,8 +120,8 @@ export const useFormStore = create<FormStore>()(
             const firstName = responses['contact_first_name'] || responses['first_name'] || responses['owner_first_name'] || '';
             const lastName = responses['contact_last_name'] || responses['last_name'] || responses['owner_last_name'] || '';
 
-            // Only sync if we have at least email or phone
-            if (email || phone) {
+            // Only sync if we have a name AND at least email or phone
+            if ((email || phone) && firstName) {
               try {
                 const response = await fetch('/api/ghl/sync-contact', {
                   method: 'POST',

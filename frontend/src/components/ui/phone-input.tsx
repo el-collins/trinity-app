@@ -15,10 +15,10 @@ export interface PhoneInputProps {
   defaultCountry?: React.ComponentProps<typeof PhoneInput>['defaultCountry'];
 }
 
-export function PhoneNumberInput({ 
-  value, 
-  onChange, 
-  className, 
+export function PhoneNumberInput({
+  value,
+  onChange,
+  className,
   error,
   placeholder = 'Enter phone number',
   defaultCountry = 'US'
@@ -26,6 +26,13 @@ export function PhoneNumberInput({
   // Custom styles to match the Input component
   // We need to target the internal classes of react-phone-number-input
   const inputClass = "flex h-12 w-full rounded-md border border-input bg-white/50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 hover:bg-white/80 focus:bg-white";
+
+  // Handle paste events to ensure pasting works properly
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    // Allow the default paste behavior - the library will handle formatting
+    // Just ensure the event isn't prevented
+    e.stopPropagation();
+  };
 
   return (
     <div className={cn(
@@ -45,10 +52,11 @@ export function PhoneNumberInput({
         onChange={(val) => onChange(val as string)}
         placeholder={placeholder}
         className="flex w-full items-center"
-        /* The library puts the input in a simple HTML input key, so we prevent it from having its own borders/styles 
+        /* The library puts the input in a simple HTML input key, so we prevent it from having its own borders/styles
            since the container handles the look. Override default library styles. */
         numberInputProps={{
           className: "bg-transparent border-0 outline-none h-full w-full text-sm",
+          onPaste: handlePaste,
         }}
       />
     </div>

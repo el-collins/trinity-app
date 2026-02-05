@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useFormStore } from '@/lib/store/formStore';
 import DynamicSection from './DynamicSection';
 import ReviewPage from './ReviewPage';
@@ -318,6 +318,25 @@ export default function DynamicFormContainer({
   const isFirstSection = currentSectionIndex === 0;
   const isLastSection = currentSectionIndex === structure.sections.length - 1;
 
+  // Check if current section has all required fields filled
+  const isCurrentSectionValid = useMemo(() => {
+    if (!currentSection) return false;
+
+    // Get visible fields based on conditional logic
+    const visibleFields = currentSection.fields.filter(field => {
+      if (field.showIf && field.showIf.field && field.showIf.value) {
+        const conditionValue = responses[field.showIf.field];
+        return conditionValue === field.showIf.value;
+      }
+      return true;
+    });
+
+    const sectionToValidate = { ...currentSection, fields: visibleFields };
+    const validationErrors = validateSection(sectionToValidate, responses);
+
+    return Object.keys(validationErrors).length === 0;
+  }, [currentSection, responses]);
+
   // AI-powered navigation handler
   const handleNextSection = async () => {
     // Validate required fields in current section before proceeding
@@ -541,7 +560,7 @@ export default function DynamicFormContainer({
               ? (onComplete || (() => setShowReview(true)))
               : handleNextSection
           }
-          disabled={aiPlanning}
+          disabled={aiPlanning || !isCurrentSectionValid}
           className="px-6 py-3 rounded-lg font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           {aiPlanning ? (

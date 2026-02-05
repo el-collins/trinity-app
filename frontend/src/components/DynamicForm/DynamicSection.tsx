@@ -7,13 +7,30 @@ interface DynamicSectionProps {
   section: FormSection;
 }
 
+// Convert snake_case or camelCase to Title Case
+const formatSectionTitle = (text: string): string => {
+  if (!text) return '';
+
+  // Replace underscores and split on capital letters
+  return text
+    .replace(/_/g, ' ')
+    .replace(/([A-Z])/g, ' $1')
+    .trim()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+
 export default function DynamicSection({ section }: DynamicSectionProps) {
+  // Get the display title - use label if available, otherwise format the name
+  const displayTitle = section.label || formatSectionTitle(section.name);
+
   return (
     <div className="bg-white rounded-lg shadow-md p-8">
       {/* Section Header */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          {section.label || section.name}
+          {displayTitle}
         </h2>
         {section.description && (
           <p className="text-gray-600">{section.description}</p>

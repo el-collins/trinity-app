@@ -19,10 +19,17 @@ export async function POST(request: NextRequest) {
       loanType 
     } = body;
 
-    // Validate required fields
+    // Validate required fields - must have at least email or phone AND a name
     if (!email && !phone) {
       return NextResponse.json(
         { error: 'Either email or phone is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!firstName?.trim()) {
+      return NextResponse.json(
+        { error: 'First name is required to sync contact' },
         { status: 400 }
       );
     }

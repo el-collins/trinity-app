@@ -363,7 +363,7 @@ export default function LoanTypeSelection({ onSelectLoanType, className }: LoanT
             <CardHeader>
               <div className="flex justify-between items-start mb-2">
                 <CardTitle className="text-lg">{loanType.name}</CardTitle>
-                <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
+                <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full whitespace-nowrap">
                   ~{loanType.estimatedTime} min
                 </span>
               </div>

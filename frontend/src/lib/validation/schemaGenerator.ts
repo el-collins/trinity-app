@@ -23,15 +23,16 @@ export function generateFieldSchema(field: FormField): z.ZodTypeAny {
 
     case 'boolean':
       // Accept both string and boolean values - handle all common formats
+      // Make it nullable/optional by default to prevent "expected string, received undefined" errors
       schema = z.union([
         z.string(),
         z.boolean(),
         z.literal(''),
         z.undefined(),
         z.null()
-      ]).transform(val => {
-        // Handle null, undefined, or empty string - default to false
-        if (val === null || val === undefined || val === '') return false;
+      ]).nullable().transform(val => {
+        // Keep undefined/null as-is for required field validation
+        if (val === null || val === undefined || val === '') return val;
         // Handle boolean values directly
         if (typeof val === 'boolean') return val;
         // Handle string representations
@@ -39,8 +40,8 @@ export function generateFieldSchema(field: FormField): z.ZodTypeAny {
           const lower = val.toLowerCase();
           return lower === 'true' || lower === 'yes';
         }
-        // Default to false for any other case
-        return false;
+        // Keep as-is for other cases
+        return val;
       });
       break;
 
@@ -74,8 +75,11 @@ export function generateFieldSchema(field: FormField): z.ZodTypeAny {
         if (fieldType === 'multi_select') {
           schema = (schema as z.ZodArray<any>).min(1, `${field.label} is required`);
         } else if (fieldType === 'boolean') {
-          // Boolean fields are always "answered" since they default to false
-          // No additional validation needed
+          // Boolean fields must be explicitly answered (not undefined)
+          schema = schema.refine(
+            val => val !== undefined && val !== null,
+            { message: `${field.label} is required` }
+          );
         } else if (fieldType === 'checkbox') {
           // Checkbox fields need special handling - must be true for consent
           // This is handled by the 'accepted' rule below
