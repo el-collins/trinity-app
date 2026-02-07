@@ -6,6 +6,7 @@ export interface ReferralData {
   // Core referral params
   referralCode: string | null;      // ref param - ISO partner code
   agentId: string | null;           // agent param - sales rep identifier
+  affiliateId: string | null;       // am_id param - GHL Affiliate Manager ID
 
   // UTM marketing params
   utmSource: string | null;         // utm_source - traffic source
@@ -27,6 +28,7 @@ const STORAGE_KEY = 'trinityiq_referral_data';
  * Captures on initial page load:
  * - ref: ISO partner referral code
  * - agent: Sales representative ID
+ * - am_id: GHL Affiliate Manager ID (for native GHL affiliate tracking)
  * - UTM parameters for marketing attribution
  *
  * Data persists in localStorage throughout the form journey.
@@ -63,6 +65,7 @@ export function useReferralTracking() {
     const hasReferralParams =
       urlParams.has('ref') ||
       urlParams.has('agent') ||
+      urlParams.has('am_id') ||
       urlParams.has('utm_source') ||
       urlParams.has('utm_medium') ||
       urlParams.has('utm_campaign') ||
@@ -78,6 +81,7 @@ export function useReferralTracking() {
     const newReferralData: ReferralData = {
       referralCode: urlParams.get('ref'),
       agentId: urlParams.get('agent'),
+      affiliateId: urlParams.get('am_id'),
       utmSource: urlParams.get('utm_source'),
       utmMedium: urlParams.get('utm_medium'),
       utmCampaign: urlParams.get('utm_campaign'),
@@ -118,6 +122,7 @@ export function useReferralTracking() {
 
     if (referralData.referralCode) data.referral_code = referralData.referralCode;
     if (referralData.agentId) data.agent_id = referralData.agentId;
+    if (referralData.affiliateId) data.affiliate_id = referralData.affiliateId;
     if (referralData.utmSource) data.utm_source = referralData.utmSource;
     if (referralData.utmMedium) data.utm_medium = referralData.utmMedium;
     if (referralData.utmCampaign) data.utm_campaign = referralData.utmCampaign;
@@ -130,7 +135,8 @@ export function useReferralTracking() {
   }, [referralData]);
 
   // Check if there's active referral tracking
-  const hasReferral = Boolean(referralData?.referralCode || referralData?.agentId);
+  const hasReferral = Boolean(referralData?.referralCode || referralData?.agentId || referralData?.affiliateId);
+  const hasAffiliateTracking = Boolean(referralData?.affiliateId);
   const hasUtmTracking = Boolean(
     referralData?.utmSource ||
     referralData?.utmMedium ||
@@ -141,6 +147,7 @@ export function useReferralTracking() {
     referralData,
     isLoaded,
     hasReferral,
+    hasAffiliateTracking,
     hasUtmTracking,
     clearReferralData,
     getReferralDataForSubmission,

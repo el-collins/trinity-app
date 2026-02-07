@@ -22,6 +22,18 @@ interface Document {
   fileUrl?: string;
 }
 
+interface WorkbookTemplate {
+  name: string;
+  url: string;
+  description: string;
+}
+
+interface WorkbookData {
+  loanTypeId: string;
+  displayName: string;
+  workbooks: WorkbookTemplate[];
+}
+
 export default function DocumentUploadPage() {
   const params = useParams();
   const router = useRouter();
@@ -29,9 +41,12 @@ export default function DocumentUploadPage() {
 
   const [tokenData, setTokenData] = useState<TokenData | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [workbooks, setWorkbooks] = useState<WorkbookData | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sendingReminder, setSendingReminder] = useState(false);
+  const [reminderSent, setReminderSent] = useState(false);
 
   useEffect(() => {
     validateTokenAndFetchDocuments();
@@ -51,11 +66,15 @@ export default function DocumentUploadPage() {
 
       setTokenData(tokenResult);
 
-      // Only fetch documents if loanTypeId is available
+      // Only fetch documents and workbooks if loanTypeId is available
       if (tokenResult.loanTypeId) {
-        const docsResponse = await fetch(`/api/documents/required?loanTypeId=${tokenResult.loanTypeId}`);
-        const docsResult = await docsResponse.json();
+        // Fetch required documents and workbook templates in parallel
+        const [docsResponse, workbooksResponse] = await Promise.all([
+          fetch(`/api/documents/required?loanTypeId=${tokenResult.loanTypeId}`),
+          fetch(`/api/documents/workbooks?loanTypeId=${tokenResult.loanTypeId}`),
+        ]);
 
+        const docsResult = await docsResponse.json();
         if (docsResult.documents && Array.isArray(docsResult.documents)) {
           // Ensure each document has required properties with defaults
           const sanitizedDocs = docsResult.documents.map((doc: Document) => ({
@@ -65,6 +84,12 @@ export default function DocumentUploadPage() {
             required: doc.required ?? true,
           }));
           setDocuments(sanitizedDocs);
+        }
+
+        // Fetch workbook templates
+        if (workbooksResponse.ok) {
+          const workbooksResult = await workbooksResponse.json();
+          setWorkbooks(workbooksResult);
         }
       }
 
@@ -109,6 +134,38 @@ export default function DocumentUploadPage() {
       setError('Upload failed. Please check your connection and try again.');
     } finally {
       setUploadingDocId(null);
+    }
+  };
+
+  const handleSendReminder = async () => {
+    if (!tokenData?.email) {
+      setError('Unable to send reminder - email not found');
+      return;
+    }
+
+    setSendingReminder(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/documents/send-reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          email: tokenData.email,
+        }),
+      });
+
+      if (response.ok) {
+        setReminderSent(true);
+      } else {
+        const result = await response.json();
+        setError(result.error || 'Failed to send reminder');
+      }
+    } catch (err) {
+      setError('Failed to send reminder. Please try again.');
+    } finally {
+      setSendingReminder(false);
     }
   };
 
@@ -158,9 +215,68 @@ export default function DocumentUploadPage() {
             Application ID: <span className="font-mono">{tokenData?.applicationId}</span>
           </p>
           <p className="text-gray-600">
-            Loan Type: <span className="font-semibold">{tokenData?.loanTypeId?.toUpperCase() || 'N/A'}</span>
+            Loan Type: <span className="font-semibold">{workbooks?.displayName || tokenData?.loanTypeId?.toUpperCase() || 'N/A'}</span>
           </p>
         </div>
+
+        {/* Workbook Templates Section */}
+        {workbooks && workbooks.workbooks.length > 0 && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-lg p-6 mb-6 border border-blue-200">
+            <div className="flex items-start gap-3 mb-4">
+              <span className="text-2xl">📋</span>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Step 1: Complete Your Workbook{workbooks.workbooks.length > 1 ? 's' : ''}
+                </h2>
+                <p className="text-gray-600 text-sm mt-1">
+                  Before uploading documents, please fill out the following template{workbooks.workbooks.length > 1 ? 's' : ''}.
+                  Click each link to make a copy, then complete and share it with us.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-4 border border-blue-100">
+              <p className="text-sm text-blue-800 font-medium mb-3">
+                💡 <strong>Tip:</strong> When you open each Google Sheet link, click &quot;Make a Copy&quot; and make sure your copy is set to Shareable so we can view it.
+              </p>
+
+              <div className="space-y-3">
+                {workbooks.workbooks.map((workbook, index) => (
+                  <a
+                    key={index}
+                    href={workbook.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group"
+                  >
+                    <span className="text-xl">📊</span>
+                    <div className="flex-1">
+                      <p className="font-semibold text-blue-900 group-hover:text-blue-700">
+                        {workbook.name}
+                      </p>
+                      <p className="text-sm text-gray-600">{workbook.description}</p>
+                    </div>
+                    <span className="text-blue-600 group-hover:text-blue-800 font-medium text-sm whitespace-nowrap">
+                      Open Template →
+                    </span>
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-500 mt-4 text-center">
+              Once you&apos;ve completed your workbook{workbooks.workbooks.length > 1 ? 's' : ''}, paste the shareable link in the upload section below or download as PDF and upload.
+            </p>
+          </div>
+        )}
+
+        {/* Step 2 Header for Documents */}
+        {workbooks && workbooks.workbooks.length > 0 && (
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xl">📤</span>
+            <h2 className="text-xl font-bold text-gray-900">Step 2: Upload Your Documents</h2>
+          </div>
+        )}
 
         {/* Progress Bar */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
@@ -176,6 +292,35 @@ export default function DocumentUploadPage() {
               style={{ width: `${progress}%` }}
             ></div>
           </div>
+
+          {/* Continue Later Option */}
+          {progress < 100 && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              {reminderSent ? (
+                <div className="flex items-center gap-2 text-green-600">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-sm">
+                    Reminder sent to {tokenData?.email}! Check your inbox to continue later.
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <p className="text-sm text-gray-600">
+                    Need to finish later? We&apos;ll email you a link to continue where you left off.
+                  </p>
+                  <button
+                    onClick={handleSendReminder}
+                    disabled={sendingReminder}
+                    className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-colors"
+                  >
+                    {sendingReminder ? 'Sending...' : 'Email me a reminder'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Error Message */}

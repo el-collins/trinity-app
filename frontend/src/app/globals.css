@@ -105,6 +105,16 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Restore pointer cursor for interactive elements */
+  button,
+  [type="button"],
+  [type="submit"],
+  [type="reset"],
+  [role="button"],
+  a {
+    cursor: pointer;
+  }
 }
 
 /* Glassmorphism Utilities */

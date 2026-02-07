@@ -10,6 +10,7 @@ import DatePicker from './fields/DatePicker';
 import MultiSelect from './fields/MultiSelect';
 import { validateField } from '@/lib/validation/schemaGenerator';
 import FileUpload from './fields/FileUpload';
+import WorkbookUpload from './fields/WorkbookUpload';
 import { PhoneNumberInput } from '../ui/phone-input';
 import SignaturePad from './fields/SignaturePad';
 
@@ -239,6 +240,19 @@ export default function DynamicField({ field }: DynamicFieldProps) {
           value={value}
           error={error}
           onChange={handleChange}
+        />
+      );
+
+    case 'workbook':
+    case 'workbook_upload':
+    case 'document_link':
+      return (
+        <WorkbookUpload
+          field={field}
+          value={value}
+          error={error}
+          onChange={handleChange}
+          onBlur={handleBlur}
         />
       );
 

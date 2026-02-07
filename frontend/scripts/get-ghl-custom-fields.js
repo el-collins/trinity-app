@@ -63,6 +63,25 @@ async function getCustomFields() {
       });
     }
 
+    // Filter for affiliate-related fields
+    const affiliateFields = customFields.filter(field =>
+      field.name.toLowerCase().includes('affiliate') ||
+      field.fieldKey?.toLowerCase().includes('affiliate') ||
+      field.fieldKey?.toLowerCase().includes('am_id')
+    );
+
+    if (affiliateFields.length > 0) {
+      console.log('\n🤝 AFFILIATE-RELATED FIELDS:');
+      console.log('='.repeat(100));
+      affiliateFields.forEach(field => {
+        console.log(`\nName: ${field.name}`);
+        console.log(`ID: ${field.id}`);
+        console.log(`Key: ${field.fieldKey || 'N/A'}`);
+        console.log(`Type: ${field.dataType}`);
+        console.log('-'.repeat(100));
+      });
+    }
+
     // Show all fields
     console.log('\n\n📋 ALL CUSTOM FIELDS:');
     console.log('='.repeat(100));
@@ -83,6 +102,16 @@ async function getCustomFields() {
         : `GHL_FIELD_${field.name.replace(/\s+/g, '_').toUpperCase()}`;
       console.log(`${envVarName}=${field.id}`);
     });
+
+    if (affiliateFields.length > 0) {
+      console.log('\n(Affiliate Fields)');
+      affiliateFields.forEach(field => {
+        const envVarName = field.fieldKey
+          ? `GHL_FIELD_${field.fieldKey.replace(/^contact\./, '').toUpperCase()}`
+          : `GHL_FIELD_${field.name.replace(/\s+/g, '_').toUpperCase()}`;
+        console.log(`${envVarName}=${field.id}`);
+      });
+    }
 
   } catch (error) {
     console.error('ERROR fetching custom fields:', error.response?.data || error.message);

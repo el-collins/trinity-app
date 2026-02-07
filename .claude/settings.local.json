@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:help.gohighlevel.com)",
+      "WebFetch(domain:ideas.gohighlevel.com)"
+    ]
+  }
+}

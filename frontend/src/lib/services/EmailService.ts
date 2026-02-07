@@ -1286,6 +1286,140 @@ This link will expire in 30 days.
   }
 
   /**
+   * Send document upload reminder email
+   * Used when applicant wants to continue uploading documents later
+   */
+  async sendDocumentUploadReminder(data: {
+    to: string;
+    firstName: string;
+    uploadLink: string;
+    loanTypeId: string;
+  }): Promise<boolean> {
+    if (!this.transporter) {
+      console.error('Email service not initialized. Cannot send email.');
+      return false;
+    }
+
+    try {
+      const fromName = process.env.EMAIL_FROM_NAME || 'Trinity Finance';
+      const fromEmail = process.env.EMAIL_USER || 'noreply@financetrinity.com';
+      const loanConfig = this.getLoanTypeEmailConfig(data.loanTypeId);
+
+      const mailOptions = {
+        from: `"${fromName}" <${fromEmail}>`,
+        to: data.to,
+        subject: `Continue Your Document Upload - ${loanConfig.displayName} - Trinity Finance`,
+        html: this.getDocumentUploadReminderHTML(data, loanConfig),
+        text: this.getDocumentUploadReminderText(data, loanConfig),
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+
+      console.log('Document upload reminder email sent:', {
+        messageId: info.messageId,
+        recipient: data.to,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to send document upload reminder:', error);
+      return false;
+    }
+  }
+
+  private getDocumentUploadReminderHTML(
+    data: { firstName: string; uploadLink: string },
+    loanConfig: LoanTypeEmailConfig
+  ): string {
+    const currentYear = new Date().getFullYear();
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Continue Your Document Upload</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 0; text-align: center;">
+        <table role="presentation" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; background-color: #ffffff; border-bottom: 2px solid #2563eb; border-radius: 8px 8px 0 0;">
+              <img src="${this.getLogoUrl()}" alt="Trinity Finance Logo" style="width: 80px; height: auto; margin-bottom: 15px;" />
+              <h1 style="margin: 0; color: #2563eb; font-size: 28px; font-weight: bold;">Trinity Finance</h1>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 40px;">
+              <h2 style="margin: 0 0 20px; color: #1f2937; font-size: 24px; text-align: center;">Continue Your Document Upload</h2>
+
+              <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Dear ${data.firstName},
+              </p>
+
+              <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                You requested a reminder to continue uploading your documents for your ${loanConfig.displayName} application. Your progress has been saved and you can pick up right where you left off.
+              </p>
+
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 40px 0;">
+                <a href="${data.uploadLink}" style="display: inline-block; padding: 16px 40px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                  Continue Uploading
+                </a>
+              </div>
+
+              <p style="margin: 20px 0 0; color: #6b7280; font-size: 14px; text-align: center;">
+                This link will expire in 7 days. If you need help, contact us at <a href="mailto:support@financetrinity.com" style="color: #2563eb;">support@financetrinity.com</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 40px; text-align: center; background-color: #1f2937; border-radius: 0 0 8px 8px;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                © ${currentYear} Trinity Finance. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+  }
+
+  private getDocumentUploadReminderText(
+    data: { firstName: string; uploadLink: string },
+    loanConfig: LoanTypeEmailConfig
+  ): string {
+    return `
+TRINITY FINANCE - Continue Your Document Upload
+
+Dear ${data.firstName},
+
+You requested a reminder to continue uploading your documents for your ${loanConfig.displayName} application. Your progress has been saved and you can pick up right where you left off.
+
+CONTINUE UPLOADING:
+${data.uploadLink}
+
+This link will expire in 7 days.
+
+If you need help, contact us at support@financetrinity.com
+
+© ${new Date().getFullYear()} Trinity Finance. All rights reserved.
+    `.trim();
+  }
+
+  /**
    * Send admin invite email with password setup link
    */
   async sendAdminInvite(

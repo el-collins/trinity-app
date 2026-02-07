@@ -27,14 +27,8 @@ export async function POST(request: NextRequest) {
       contactSource,
       submittedAt,
       applicationUrl,
-      // Referral tracking data
-      referralCode,
-      agentId,
-      utmSource,
-      utmMedium,
-      utmCampaign,
-      utmTerm,
-      utmContent,
+      // GHL Affiliate tracking
+      affiliateId,
     } = body;
 
     // console.log('Received submission payload:', JSON.stringify(body, null, 2));
@@ -110,56 +104,14 @@ export async function POST(request: NextRequest) {
       },
     ];
 
-    // Add referral tracking fields if configured and have values
-    if (referralCode && config.goHighLevel.customFields.referralCode) {
+    // GHL Affiliate Manager ID for native affiliate tracking
+    if (affiliateId && config.goHighLevel.customFields.affiliateId) {
       customFields.push({
-        id: config.goHighLevel.customFields.referralCode,
-        key: 'referral_code',
-        field_value: referralCode,
+        id: config.goHighLevel.customFields.affiliateId,
+        key: 'am_id',
+        field_value: affiliateId,
       });
-    }
-
-    if (agentId && config.goHighLevel.customFields.agentId) {
-      customFields.push({
-        id: config.goHighLevel.customFields.agentId,
-        key: 'agent_id',
-        field_value: agentId,
-      });
-    }
-
-    if (utmSource && config.goHighLevel.customFields.utmSource) {
-      customFields.push({
-        id: config.goHighLevel.customFields.utmSource,
-        key: 'utm_source',
-        field_value: utmSource,
-      });
-    }
-
-    if (utmMedium && config.goHighLevel.customFields.utmMedium) {
-      customFields.push({
-        id: config.goHighLevel.customFields.utmMedium,
-        key: 'utm_medium',
-        field_value: utmMedium,
-      });
-    }
-
-    if (utmCampaign && config.goHighLevel.customFields.utmCampaign) {
-      customFields.push({
-        id: config.goHighLevel.customFields.utmCampaign,
-        key: 'utm_campaign',
-        field_value: utmCampaign,
-      });
-    }
-
-    // Log referral data if present
-    if (referralCode || agentId || utmCampaign) {
-      console.log('[GHL] Syncing referral tracking:', {
-        referralCode,
-        agentId,
-        utmSource,
-        utmMedium,
-        utmCampaign,
-      });
+      console.log('[GHL] Syncing affiliate tracking: am_id =', affiliateId);
     }
 
     // Send to GHL
@@ -173,7 +125,11 @@ export async function POST(request: NextRequest) {
       city,
       state,
       postalCode,
-      tags: ['Application Submitted', loanType, ...(referralCode ? [`Referral: ${referralCode}`] : [])],
+      tags: [
+        'Application Submitted',
+        loanType,
+        ...(affiliateId ? ['Affiliate Lead'] : []),
+      ],
       source: contactSource || 'Trinity Finance SmartForm',
       customFields,
     });

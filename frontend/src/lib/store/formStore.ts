@@ -266,6 +266,7 @@ export const useFormStore = create<FormStore>()(
               referralData: referralData ? {
                 referralCode: referralData.referralCode,
                 agentId: referralData.agentId,
+                affiliateId: referralData.affiliateId,
                 utmSource: referralData.utmSource,
                 utmMedium: referralData.utmMedium,
                 utmCampaign: referralData.utmCampaign,
@@ -311,6 +312,7 @@ export const useFormStore = create<FormStore>()(
           // Referral tracking data for GHL
           referralCode: referralData?.referralCode || '',
           agentId: referralData?.agentId || '',
+          affiliateId: referralData?.affiliateId || '',
           utmSource: referralData?.utmSource || '',
           utmMedium: referralData?.utmMedium || '',
           utmCampaign: referralData?.utmCampaign || '',

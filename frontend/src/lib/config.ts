@@ -26,12 +26,8 @@ export const config = {
       loanType: process.env.GHL_FIELD_LOAN_TYPE || '',
       applicationUrl: process.env.GHL_FIELD_APPLICATION_URL || '',
       submissionDate: process.env.GHL_FIELD_SUBMISSION_DATE || new Date().toISOString().split('T')[0],
-      // Referral tracking fields
-      referralCode: process.env.GHL_FIELD_REFERRAL_CODE || '',
-      agentId: process.env.GHL_FIELD_AGENT_ID || '',
-      utmSource: process.env.GHL_FIELD_UTM_SOURCE || '',
-      utmMedium: process.env.GHL_FIELD_UTM_MEDIUM || '',
-      utmCampaign: process.env.GHL_FIELD_UTM_CAMPAIGN || '',
+      // GHL Affiliate Manager ID (am_id) for native affiliate tracking
+      affiliateId: process.env.GHL_FIELD_AFFILIATE_ID || '',
     },
   },
 

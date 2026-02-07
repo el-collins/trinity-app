@@ -271,6 +271,29 @@ export default function DynamicFormContainer({
     return () => clearTimeout(timeoutId);
   }, [responses, applicationId, loanTypeId, currentSectionIndex]);
 
+  // Derive currentSection early (before any returns) for use in useMemo
+  const currentSection = structure?.sections?.[currentSectionIndex];
+
+  // Check if current section has all required fields filled
+  // This must be called before any early returns to maintain hook order
+  const isCurrentSectionValid = useMemo(() => {
+    if (!currentSection) return false;
+
+    // Get visible fields based on conditional logic
+    const visibleFields = currentSection.fields.filter(field => {
+      if (field.showIf && field.showIf.field && field.showIf.value) {
+        const conditionValue = responses[field.showIf.field];
+        return conditionValue === field.showIf.value;
+      }
+      return true;
+    });
+
+    const sectionToValidate = { ...currentSection, fields: visibleFields };
+    const validationErrors = validateSection(sectionToValidate, responses);
+
+    return Object.keys(validationErrors).length === 0;
+  }, [currentSection, responses]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -301,8 +324,6 @@ export default function DynamicFormContainer({
     }} />;
   }
 
-  const currentSection = structure.sections[currentSectionIndex];
-
   // Safety check: ensure current section exists
   if (!currentSection) {
     return (
@@ -317,25 +338,6 @@ export default function DynamicFormContainer({
 
   const isFirstSection = currentSectionIndex === 0;
   const isLastSection = currentSectionIndex === structure.sections.length - 1;
-
-  // Check if current section has all required fields filled
-  const isCurrentSectionValid = useMemo(() => {
-    if (!currentSection) return false;
-
-    // Get visible fields based on conditional logic
-    const visibleFields = currentSection.fields.filter(field => {
-      if (field.showIf && field.showIf.field && field.showIf.value) {
-        const conditionValue = responses[field.showIf.field];
-        return conditionValue === field.showIf.value;
-      }
-      return true;
-    });
-
-    const sectionToValidate = { ...currentSection, fields: visibleFields };
-    const validationErrors = validateSection(sectionToValidate, responses);
-
-    return Object.keys(validationErrors).length === 0;
-  }, [currentSection, responses]);
 
   // AI-powered navigation handler
   const handleNextSection = async () => {

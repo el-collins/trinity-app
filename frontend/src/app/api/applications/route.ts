@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
         referralTracking: referralData ? {
           referralCode: referralData.referralCode || null,
           agentId: referralData.agentId || null,
+          affiliateId: referralData.affiliateId || null,
           utmSource: referralData.utmSource || null,
           utmMedium: referralData.utmMedium || null,
           utmCampaign: referralData.utmCampaign || null,
@@ -159,6 +160,7 @@ export async function POST(request: NextRequest) {
         referralTracking: referralData ? {
           referralCode: referralData.referralCode || null,
           agentId: referralData.agentId || null,
+          affiliateId: referralData.affiliateId || null,
           utmSource: referralData.utmSource || null,
           utmMedium: referralData.utmMedium || null,
           utmCampaign: referralData.utmCampaign || null,
