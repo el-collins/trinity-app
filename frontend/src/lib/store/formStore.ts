@@ -366,6 +366,7 @@ export const useFormStore = create<FormStore>()(
             email: applicantEmail,
             firstName: responses['contact_first_name'] || responses['first_name'] || 'Applicant',
             loanType: structure.name,
+            loanTypeId, // Include loan type ID for loan-specific email templates
             uploadLink,
           }),
         });

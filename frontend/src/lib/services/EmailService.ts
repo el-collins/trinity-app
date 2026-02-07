@@ -4,6 +4,118 @@ import { config } from '../config';
 import { firestore } from '../firebase/admin';
 
 /**
+ * Workbook template configuration for each loan type
+ * These are Google Sheets templates that applicants need to fill out
+ */
+interface WorkbookTemplate {
+  name: string;
+  url: string;
+  description: string;
+}
+
+interface LoanTypeEmailConfig {
+  displayName: string;
+  uniqueBulletPoint?: string; // Loan-specific bullet point for the email
+  workbooks: WorkbookTemplate[];
+}
+
+/**
+ * Configuration mapping loan type IDs to their email content and required workbooks
+ * Note: Update URLs when Morgan provides the final Google Sheets template links
+ */
+const LOAN_TYPE_EMAIL_CONFIG: Record<string, LoanTypeEmailConfig> = {
+  equipment_finance: {
+    displayName: 'Equipment Finance',
+    workbooks: [
+      {
+        name: 'Equipment Finance Workbook',
+        url: 'https://docs.google.com/spreadsheets/d/1nF_E7Fw67oZEDjTngK7yU2G3FQoSE0-09G1r4vu7_Y4/copy',
+        description: 'Details about the equipment you are financing',
+      },
+      {
+        name: 'Debt Schedule Workbook',
+        url: 'https://docs.google.com/spreadsheets/d/16PBMELjx0T6D_Il5-bZwUh1kVVkH18DzRTgXzxyiWTY/copy',
+        description: 'Current business debts and obligations',
+      },
+    ],
+  },
+  sba: {
+    displayName: 'SBA Loan',
+    workbooks: [
+      {
+        name: 'Debt Schedule Workbook',
+        url: 'https://docs.google.com/spreadsheets/d/16PBMELjx0T6D_Il5-bZwUh1kVVkH18DzRTgXzxyiWTY/copy',
+        description: 'Current business debts and obligations',
+      },
+    ],
+  },
+  line_of_credit: {
+    displayName: 'Line of Credit',
+    uniqueBulletPoint: 'Clearly define current debts (if any)',
+    workbooks: [
+      {
+        name: 'Debt Schedule Workbook',
+        url: 'https://docs.google.com/spreadsheets/d/16PBMELjx0T6D_Il5-bZwUh1kVVkH18DzRTgXzxyiWTY/copy',
+        description: 'Current business debts and obligations',
+      },
+    ],
+  },
+  mca: {
+    displayName: 'Merchant Cash Advance',
+    uniqueBulletPoint: 'Clearly define current debts (if any)',
+    workbooks: [
+      {
+        name: 'Debt Schedule Workbook',
+        url: 'https://docs.google.com/spreadsheets/d/16PBMELjx0T6D_Il5-bZwUh1kVVkH18DzRTgXzxyiWTY/copy',
+        description: 'Current business debts and obligations',
+      },
+    ],
+  },
+  invoice_financing: {
+    displayName: 'Invoice Financing',
+    uniqueBulletPoint: 'Clearly define current aging reports',
+    workbooks: [
+      {
+        name: 'Debt Schedule Workbook',
+        url: 'https://docs.google.com/spreadsheets/d/16PBMELjx0T6D_Il5-bZwUh1kVVkH18DzRTgXzxyiWTY/copy',
+        description: 'Current business debts and obligations',
+      },
+      {
+        name: 'Accounts Receivable Workbook',
+        url: 'https://docs.google.com/spreadsheets/d/1pRiAcjQlTJns3-VTtZ-6Dm19itB_R8OVfZY4aiCR19k/copy',
+        description: 'Outstanding invoices and accounts receivable aging',
+      },
+    ],
+  },
+  invoice_factoring: {
+    displayName: 'Invoice Factoring',
+    uniqueBulletPoint: 'Clearly define current aging reports',
+    workbooks: [
+      {
+        name: 'Debt Schedule Workbook',
+        url: 'https://docs.google.com/spreadsheets/d/16PBMELjx0T6D_Il5-bZwUh1kVVkH18DzRTgXzxyiWTY/copy',
+        description: 'Current business debts and obligations',
+      },
+      {
+        name: 'Accounts Receivable Workbook',
+        url: 'https://docs.google.com/spreadsheets/d/1pRiAcjQlTJns3-VTtZ-6Dm19itB_R8OVfZY4aiCR19k/copy',
+        description: 'Outstanding invoices and accounts receivable aging',
+      },
+    ],
+  },
+  general: {
+    displayName: 'Business Loan',
+    workbooks: [
+      {
+        name: 'Debt Schedule Workbook',
+        url: 'https://docs.google.com/spreadsheets/d/16PBMELjx0T6D_Il5-bZwUh1kVVkH18DzRTgXzxyiWTY/copy',
+        description: 'Current business debts and obligations',
+      },
+    ],
+  },
+};
+
+/**
  * Email Service using Nodemailer with SMTP
  * Sends application confirmation emails to applicants
  */
@@ -78,6 +190,15 @@ class EmailService {
       console.error('Failed to initialize email service:', error);
       this.transporter = null;
     }
+  }
+
+  /**
+   * Get loan-specific email configuration
+   * Returns configuration with workbooks and messaging for the given loan type
+   */
+  private getLoanTypeEmailConfig(loanTypeId: string): LoanTypeEmailConfig {
+    const normalizedId = loanTypeId.toLowerCase().replace(/[\s-]+/g, '_');
+    return LOAN_TYPE_EMAIL_CONFIG[normalizedId] || LOAN_TYPE_EMAIL_CONFIG['general'];
   }
 
   /**
@@ -751,11 +872,13 @@ Questions? Contact us at iq@financetrinity.com
   /**
    * Send document request email with upload link
    * Used after application submission to request required documents
+   * Now includes loan-specific workbook templates and messaging
    */
   async sendDocumentRequestEmail(data: {
     to: string;
     firstName: string;
     loanType: string;
+    loanTypeId: string;
     uploadLink: string;
     requiredDocuments?: string[];
   }): Promise<boolean> {
@@ -768,12 +891,15 @@ Questions? Contact us at iq@financetrinity.com
       const fromName = process.env.EMAIL_FROM_NAME || 'Trinity Finance';
       const fromEmail = process.env.EMAIL_USER || 'noreply@financetrinity.com';
 
+      // Get loan-specific email configuration
+      const loanConfig = this.getLoanTypeEmailConfig(data.loanTypeId);
+
       const mailOptions = {
         from: `"${fromName}" <${fromEmail}>`,
         to: data.to,
-        subject: `Document Upload Required - ${data.loanType} Application`,
-        html: this.getDocumentRequestHTML(data),
-        text: this.getDocumentRequestText(data),
+        subject: `Document Gathering - ${loanConfig.displayName} Application - Trinity Finance`,
+        html: this.getDocumentRequestHTML({ ...data, loanConfig }),
+        text: this.getDocumentRequestText({ ...data, loanConfig }),
       };
 
       const info = await this.transporter.sendMail(mailOptions);
@@ -781,6 +907,8 @@ Questions? Contact us at iq@financetrinity.com
       console.log('Document request email sent successfully:', {
         messageId: info.messageId,
         recipient: data.to,
+        loanTypeId: data.loanTypeId,
+        workbooksIncluded: loanConfig.workbooks.map(w => w.name),
       });
 
       return true;
@@ -792,16 +920,43 @@ Questions? Contact us at iq@financetrinity.com
 
   /**
    * Generate HTML email template for document request
+   * Updated to match Morgan's loan-specific templates with workbook links
    */
   private getDocumentRequestHTML(data: {
     firstName: string;
     loanType: string;
     uploadLink: string;
     requiredDocuments?: string[];
+    loanConfig: LoanTypeEmailConfig;
   }): string {
-    const documentsList = data.requiredDocuments && data.requiredDocuments.length > 0
-      ? data.requiredDocuments.map(doc => `<li style="margin: 0 0 8px;">${doc}</li>`).join('')
-      : '<li style="margin: 0 0 8px;">Driver\'s License (front and back)</li><li style="margin: 0 0 8px;">Bank Statements</li><li style="margin: 0 0 8px;">Tax Returns</li>';
+    const currentYear = new Date().getFullYear();
+
+    // Generate workbook links section
+    const workbooksHTML = data.loanConfig.workbooks.map(workbook => `
+      <p style="margin: 15px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
+        Access and Complete Our ${workbook.name} here:
+      </p>
+      <p style="margin: 10px 0 20px;">
+        <a href="${workbook.url}" style="color: #2563eb; font-size: 16px; text-decoration: none; font-weight: bold;">
+          &#128073; ${workbook.name}
+        </a>
+      </p>
+    `).join('');
+
+    // Build the purpose bullets with loan-specific content
+    let purposeBullets = `
+      <li style="margin: 0 0 8px;">Verify your business information and ownership,</li>
+    `;
+
+    // Add loan-specific bullet if present
+    if (data.loanConfig.uniqueBulletPoint) {
+      purposeBullets += `<li style="margin: 0 0 8px;">${data.loanConfig.uniqueBulletPoint},</li>`;
+    }
+
+    purposeBullets += `
+      <li style="margin: 0 0 8px;">Review financial performance, and</li>
+      <li style="margin: 0 0 8px;">Match you with the most competitive loan terms available.</li>
+    `;
 
     return `
 <!DOCTYPE html>
@@ -809,7 +964,7 @@ Questions? Contact us at iq@financetrinity.com
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document Upload Required</title>
+  <title>Document Gathering - Trinity Finance</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -827,55 +982,107 @@ Questions? Contact us at iq@financetrinity.com
           <!-- Main Content -->
           <tr>
             <td style="padding: 40px;">
-              <h2 style="margin: 0 0 20px; color: #1f2937; font-size: 24px; text-align: center;">Document Upload Required</h2>
-
               <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
                 Dear ${data.firstName},
               </p>
 
               <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
-                Thank you for submitting your ${data.loanType} application! To continue processing your application, we need you to upload the following documents:
+                Thank you for moving forward with us at Trinity Finance. We're excited to take the next step toward securing the best funding option for your business.
               </p>
 
-              <!-- Documents List -->
-              <div style="background-color: #f9fafb; border-radius: 6px; padding: 20px; margin: 30px 0;">
-                <h3 style="margin: 0 0 15px; color: #1f2937; font-size: 18px;">Required Documents</h3>
-                <ul style="margin: 0; padding: 0 0 0 20px; color: #4b5563; font-size: 15px; line-height: 1.8;">
-                  ${documentsList}
-                </ul>
+              <p style="margin: 0 0 15px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                To submit your application to our lending partners, we'll need a few supporting documents. These allow us (and the lender) to:
+              </p>
+
+              <ul style="margin: 0 0 20px; padding: 0 0 0 25px; color: #4b5563; font-size: 16px; line-height: 1.8;">
+                ${purposeBullets}
+              </ul>
+
+              <!-- Important Notice -->
+              <div style="background-color: #f9fafb; border-left: 4px solid #2563eb; padding: 15px 20px; margin: 25px 0;">
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: bold;">
+                  Please Read Before Sending Your Documents
+                </p>
+                <p style="margin: 10px 0 0; color: #4b5563; font-size: 15px; line-height: 1.6;">
+                  The documents we're asking for are a normal part of this process and help us move your file to the lender for review. Once we get everything, we'll put your full package together and keep you updated along the way.
+                </p>
               </div>
 
-              <p style="margin: 0 0 30px; color: #4b5563; font-size: 16px; line-height: 1.6;">
-                Please use the secure upload link below to submit your documents. This link will expire in 7 days.
+              <!-- Workbook Instructions -->
+              <p style="margin: 25px 0 15px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                To make things easy, please use our Workbook${data.loanConfig.workbooks.length > 1 ? 's' : ''} to organize your information.<br>
+                <strong>When you open each Google Sheet link, click "Make a Copy" and make sure your copy is set to Shareable so we can view it.</strong>
               </p>
 
-              <!-- CTA Button -->
-              <div style="text-align: center; margin: 40px 0;">
-                <a href="${data.uploadLink}" style="display: inline-block; padding: 16px 40px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                  Upload Documents
+              <!-- Workbook Links -->
+              <div style="background-color: #f0f9ff; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                ${workbooksHTML}
+              </div>
+
+              <p style="margin: 20px 0; color: #4b5563; font-size: 15px; line-height: 1.6;">
+                ${data.loanConfig.workbooks.length > 1
+                  ? 'These help us collect everything we need to move your loan forward quickly and smoothly.'
+                  : 'This helps us collect everything we need to move your loan forward quickly and smoothly.'}
+              </p>
+
+              <p style="margin: 25px 0 15px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Once you've completed the Workbook${data.loanConfig.workbooks.length > 1 ? 's' : ''}, please use the Upload Supporting Documents link below to share them with us:
+              </p>
+
+              <!-- Upload Link -->
+              <p style="margin: 10px 0 25px;">
+                <a href="${data.uploadLink}" style="color: #2563eb; font-size: 16px; text-decoration: none; font-weight: bold;">
+                  &#128073; Upload Supporting Documents
                 </a>
+              </p>
+
+              <p style="margin: 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Please upload or send the requested documents as soon as possible so we can keep your application on track. If you have any questions or need help gathering them, we're happy to assist.
+              </p>
+
+              <p style="margin: 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Thank you again for choosing Trinity Finance — we look forward to helping your business reach its next stage of growth.
+              </p>
+
+              <!-- Signature -->
+              <div style="margin: 30px 0 0; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                <p style="margin: 0 0 5px; color: #4b5563; font-size: 16px;">
+                  Looking Forward to Helping You Succeed,
+                </p>
+                <p style="margin: 15px 0 5px; color: #1f2937; font-size: 16px; font-weight: bold;">
+                  Morgan Hall
+                </p>
+                <p style="margin: 0 0 5px; color: #6b7280; font-size: 14px;">
+                  Founder/CEO
+                </p>
+                <p style="margin: 0 0 5px; color: #6b7280; font-size: 14px;">
+                  Trinity Finance
+                </p>
+                <p style="margin: 0;">
+                  <a href="https://www.financetrinity.com" style="color: #2563eb; font-size: 14px; text-decoration: none;">
+                    www.financetrinity.com
+                  </a>
+                </p>
               </div>
-
-              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
-                <strong>Note:</strong> All uploads are secure and encrypted. You can upload documents one at a time or all at once.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Contact Section -->
-          <tr>
-            <td style="padding: 30px 40px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
-              <p style="margin: 0 0 10px; color: #6b7280; font-size: 14px; text-align: center;">
-                Questions? Contact us at <a href="mailto:iq@financetrinity.com" style="color: #667eea; text-decoration: none;">iq@financetrinity.com</a>
-              </p>
             </td>
           </tr>
 
           <!-- Footer -->
           <tr>
-            <td style="padding: 20px 40px; text-align: center; background-color: #1f2937; border-radius: 0 0 8px 8px;">
-              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                © ${new Date().getFullYear()} Trinity Finance. All rights reserved.
+            <td style="padding: 30px 40px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px; color: #6b7280; font-size: 12px; text-align: center;">
+                Copyright © ${currentYear} Trinity Finance, All rights reserved.
+              </p>
+              <p style="margin: 0 0 10px; color: #6b7280; font-size: 12px; text-align: center;">
+                Our e-mail address is: <a href="mailto:support@financetrinity.com" style="color: #2563eb; text-decoration: none;">support@financetrinity.com</a>
+              </p>
+              <p style="margin: 0 0 10px; color: #6b7280; font-size: 12px; text-align: center;">
+                Our mailing address is: 613 Chillicothe Street, Portsmouth, Ohio 45662<br>
+                ATTN: Trinity Finance
+              </p>
+              <p style="margin: 15px 0 0; color: #6b7280; font-size: 11px; text-align: center;">
+                Want to change how you receive these emails?<br>
+                You can <a href="#" style="color: #2563eb; text-decoration: none;">Unsubscribe From Emails</a>.
               </p>
             </td>
           </tr>
@@ -890,39 +1097,79 @@ Questions? Contact us at iq@financetrinity.com
 
   /**
    * Generate plain text email for document request
+   * Updated to match Morgan's loan-specific templates with workbook links
    */
   private getDocumentRequestText(data: {
     firstName: string;
     loanType: string;
     uploadLink: string;
     requiredDocuments?: string[];
+    loanConfig: LoanTypeEmailConfig;
   }): string {
-    const documentsList = data.requiredDocuments && data.requiredDocuments.length > 0
-      ? data.requiredDocuments.map(doc => `- ${doc}`).join('\n')
-      : '- Driver\'s License (front and back)\n- Bank Statements\n- Tax Returns';
+    const currentYear = new Date().getFullYear();
+
+    // Generate workbook links section
+    const workbooksText = data.loanConfig.workbooks.map(workbook =>
+      `Access and Complete Our ${workbook.name} here:\n👉 ${workbook.url}`
+    ).join('\n\n');
+
+    // Build purpose bullets
+    let purposeBullets = '• Verify your business information and ownership,\n';
+    if (data.loanConfig.uniqueBulletPoint) {
+      purposeBullets += `• ${data.loanConfig.uniqueBulletPoint},\n`;
+    }
+    purposeBullets += '• Review financial performance, and\n';
+    purposeBullets += '• Match you with the most competitive loan terms available.';
 
     return `
-TRINITY FINANCE - Document Upload Required
-
 Dear ${data.firstName},
 
-Thank you for submitting your ${data.loanType} application! To continue processing your application, we need you to upload the following documents:
+Thank you for moving forward with us at Trinity Finance. We're excited to take the next step toward securing the best funding option for your business.
 
-REQUIRED DOCUMENTS
-------------------
-${documentsList}
+To submit your application to our lending partners, we'll need a few supporting documents. These allow us (and the lender) to:
 
-UPLOAD YOUR DOCUMENTS
----------------------
-${data.uploadLink}
+${purposeBullets}
 
-This secure upload link will expire in 7 days.
+PLEASE READ BEFORE SENDING YOUR DOCUMENTS
+------------------------------------------
+The documents we're asking for are a normal part of this process and help us move your file to the lender for review. Once we get everything, we'll put your full package together and keep you updated along the way.
 
-Note: All uploads are secure and encrypted. You can upload documents one at a time or all at once.
+To make things easy, please use our Workbook${data.loanConfig.workbooks.length > 1 ? 's' : ''} to organize your information.
+When you open each Google Sheet link, click "Make a Copy" and make sure your copy is set to Shareable so we can view it.
 
-Questions? Contact us at iq@financetrinity.com
+${workbooksText}
 
-© ${new Date().getFullYear()} Trinity Finance. All rights reserved.
+${data.loanConfig.workbooks.length > 1
+  ? 'These help us collect everything we need to move your loan forward quickly and smoothly.'
+  : 'This helps us collect everything we need to move your loan forward quickly and smoothly.'}
+
+Once you've completed the Workbook${data.loanConfig.workbooks.length > 1 ? 's' : ''}, please use the Upload Supporting Documents link below to share them with us:
+
+Upload Supporting Documents here:
+👉 ${data.uploadLink}
+
+Please upload or send the requested documents as soon as possible so we can keep your application on track. If you have any questions or need help gathering them, we're happy to assist.
+
+Thank you again for choosing Trinity Finance — we look forward to helping your business reach its next stage of growth.
+
+Looking Forward to Helping You Succeed,
+
+Morgan Hall
+Founder/CEO
+Trinity Finance
+www.financetrinity.com
+
+---
+
+Copyright © ${currentYear} Trinity Finance, All rights reserved.
+
+Our e-mail address is: support@financetrinity.com
+
+Our mailing address is: 613 Chillicothe Street, Portsmouth, Ohio 45662
+ATTN: Trinity Finance
+
+Want to change how you receive these emails?
+You can Unsubscribe From Emails.
     `.trim();
   }
 
