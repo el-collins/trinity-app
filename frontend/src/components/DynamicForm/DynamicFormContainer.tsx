@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useFormStore } from '@/lib/store/formStore';
 import DynamicSection from './DynamicSection';
 import ReviewPage from './ReviewPage';
+import DocumentCollectionStep from './DocumentCollectionStep';
 import SaveAndExitModal from '../Modals/SaveAndExitModal';
 import { getResumeTokenFromURL } from '@/lib/utils/urlState';
 import { applyDerivations, FieldDerivation } from '@/lib/utils/fieldDerivations';
@@ -42,6 +43,10 @@ export default function DynamicFormContainer({
     loadFromURL,
     resetForm,
     markSectionComplete,
+    showDocumentCollection,
+    submittedApplicationId,
+    uploadToken,
+    finishAndRedirect,
   } = useFormStore();
 
   const [showReview, setShowReview] = useState(false);
@@ -312,6 +317,26 @@ export default function DynamicFormContainer({
           <p className="text-red-600">Failed to load form configuration</p>
         </div>
       </div>
+    );
+  }
+
+  // Show document collection step after submission
+  if (showDocumentCollection && submittedApplicationId) {
+    const applicantEmail = responses['owner_email'] ||
+                          responses['business_email'] ||
+                          responses['email'] ||
+                          responses['contact_email'] ||
+                          '';
+
+    return (
+      <DocumentCollectionStep
+        applicationId={submittedApplicationId}
+        uploadToken={uploadToken || ''}
+        loanTypeId={loanTypeId}
+        loanTypeName={structure?.name || ''}
+        applicantEmail={applicantEmail}
+        onFinish={finishAndRedirect}
+      />
     );
   }
 

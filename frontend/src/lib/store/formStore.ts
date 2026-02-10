@@ -11,19 +11,24 @@ export interface FormState {
   loanTypeId: string | null;
   structure: LoanTypeDefinition | null;
   applicationId: string | null; // For resume functionality
-  
+
   // Navigation
   currentSectionIndex: number;
   completedSections: string[];
-  
+
   // Form Data
   responses: Record<string, any>; // fieldId -> value
   errors: Record<string, string>; // fieldId -> error message
-  
+
   // UI State
   isLoading: boolean;
   isSubmitting: boolean;
   isValid: boolean;
+
+  // Post-submission document collection state
+  submittedApplicationId: string | null;
+  uploadToken: string | null;
+  showDocumentCollection: boolean;
 }
 
 interface FormActions {
@@ -46,6 +51,7 @@ interface FormActions {
   // Form Actions
   validateCurrentSection: () => boolean;
   submitForm: () => Promise<void>;
+  finishAndRedirect: () => void;
   resetForm: () => void;
   
   // URL State Management
@@ -70,6 +76,9 @@ const initialState: FormState = {
   isLoading: false,
   isSubmitting: false,
   isValid: false,
+  submittedApplicationId: null,
+  uploadToken: null,
+  showDocumentCollection: false,
 };
 
 export const useFormStore = create<FormStore>()(
@@ -325,21 +334,20 @@ export const useFormStore = create<FormStore>()(
       // Don't fail submission if GHL sync fails
     }
 
-    // Trigger document collection
+    // Trigger document collection - generate token and send email
+    // but stay on the page to show the embedded document collection step
+    let generatedToken: string | null = null;
     try {
-      // Try multiple common field names for email
-      // prioritizing owner_email based on DB schema
-      const applicantEmail = responses['owner_email'] || 
-                            responses['business_email'] || 
-                            responses['email'] || 
-                            responses['contact_email'] || 
+      const applicantEmail = responses['owner_email'] ||
+                            responses['business_email'] ||
+                            responses['email'] ||
+                            responses['contact_email'] ||
                             '';
-      
+
       console.log('Document collection trigger - Email found:', applicantEmail ? applicantEmail : 'NONE');
 
       if (!applicantEmail) {
         console.error('No email found in responses. Available keys:', Object.keys(responses));
-        // We can't proceed without an email
         throw new Error('No applicant email found for document collection');
       }
 
@@ -356,11 +364,13 @@ export const useFormStore = create<FormStore>()(
 
       if (tokenResponse.ok) {
         const { token } = await tokenResponse.json();
+        generatedToken = token;
         const uploadLink = `${window.location.origin}/documents/upload/${token}`;
-        
+
         console.log('Generated upload token:', token);
         console.log('Upload link:', uploadLink);
 
+        // Send the document request email as a backup (so they can continue later)
         const emailResponse = await fetch('/api/documents/request-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -368,40 +378,30 @@ export const useFormStore = create<FormStore>()(
             email: applicantEmail,
             firstName: responses['contact_first_name'] || responses['first_name'] || 'Applicant',
             loanType: structure.name,
-            loanTypeId, // Include loan type ID for loan-specific email templates
+            loanTypeId,
             uploadLink,
           }),
         });
-        
+
         if (emailResponse.ok) {
           console.log('Document collection email sent successfully');
         } else {
           console.error('Failed to send document email. Status:', emailResponse.status);
-          const errorData = await emailResponse.json();
-          console.error('Error detail:', errorData);
         }
       } else {
         console.error('Failed to generate token. Status:', tokenResponse.status);
-        const errorData = await tokenResponse.json();
-        console.error('Token error:', errorData);
       }
     } catch (docError) {
       console.error('Document collection setup failed:', docError);
       // Don't fail submission if document collection fails
     }
-    
-    // Clear localStorage AND reset store state
-    localStorage.removeItem('trinity-form-storage');
-    localStorage.removeItem('trinityiq_referral_data'); // Clear referral tracking
-    set(initialState);
 
-    // Redirect to success page with referral params for display
-    const successParams = new URLSearchParams({ id: submittedApplicationId });
-    if (referralData?.referralCode) successParams.set('ref', referralData.referralCode);
-    if (referralData?.agentId) successParams.set('agent', referralData.agentId);
-    if (referralData?.utmCampaign) successParams.set('campaign', referralData.utmCampaign);
-
-    window.location.href = `/success?${successParams.toString()}`;
+    // Show document collection step instead of redirecting
+    set({
+      submittedApplicationId,
+      uploadToken: generatedToken,
+      showDocumentCollection: true,
+    });
         } catch (error) {
           console.error('Form submission error:', error);
           alert(error instanceof Error ? error.message : 'Failed to submit application. Please try again.');
@@ -410,6 +410,25 @@ export const useFormStore = create<FormStore>()(
         }
       },
       
+      // Finish document collection and redirect to success page
+      finishAndRedirect: () => {
+        const { submittedApplicationId } = get();
+        const referralData = getReferralDataFromStorage();
+
+        // Clear localStorage AND reset store state
+        localStorage.removeItem('trinity-form-storage');
+        localStorage.removeItem('trinityiq_referral_data');
+        set(initialState);
+
+        // Redirect to success page
+        const successParams = new URLSearchParams({ id: submittedApplicationId || '' });
+        if (referralData?.referralCode) successParams.set('ref', referralData.referralCode);
+        if (referralData?.agentId) successParams.set('agent', referralData.agentId);
+        if (referralData?.utmCampaign) successParams.set('campaign', referralData.utmCampaign);
+
+        window.location.href = `/success?${successParams.toString()}`;
+      },
+
       // URL State Management
       syncToURL: () => {
         // DISABLED: We no longer sync state to URL to avoid 431 errors
