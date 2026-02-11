@@ -8,7 +8,8 @@ interface ReviewPageProps {
 }
 
 export default function ReviewPage({ onEdit }: ReviewPageProps) {
-  const { structure, responses, errors, goToSection, submitForm, isSubmitting } = useFormStore();
+  const { structure, responses, errors, goToSection, submitForm, isSubmitting, applicationId } = useFormStore();
+  const isUpdate = !!applicationId;
   const [showConfirm, setShowConfirm] = useState(false);
 
   if (!structure) {
@@ -168,10 +169,10 @@ export default function ReviewPage({ onEdit }: ReviewPageProps) {
           {isSubmitting ? (
             <>
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              Submitting...
+              {isUpdate ? 'Updating...' : 'Submitting...'}
             </>
           ) : (
-            'Submit Application'
+            isUpdate ? 'Update Application' : 'Submit Application'
           )}
         </button>
       </div>
@@ -181,10 +182,12 @@ export default function ReviewPage({ onEdit }: ReviewPageProps) {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 max-w-md mx-4">
             <h3 className="text-xl font-bold text-gray-900 mb-4">
-              Confirm Submission
+              {isUpdate ? 'Confirm Update' : 'Confirm Submission'}
             </h3>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to submit this application? Once submitted, you will not be able to make changes.
+              {isUpdate
+                ? 'Are you sure you want to update this application? Your changes will be saved.'
+                : 'Are you sure you want to submit this application? Once submitted, you will not be able to make changes.'}
             </p>
             <div className="flex gap-4">
               <button
@@ -197,7 +200,7 @@ export default function ReviewPage({ onEdit }: ReviewPageProps) {
                 onClick={handleSubmit}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
-                Yes, Submit
+                {isUpdate ? 'Yes, Update' : 'Yes, Submit'}
               </button>
             </div>
           </div>
