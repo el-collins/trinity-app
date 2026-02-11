@@ -73,8 +73,9 @@ export async function GET(request: NextRequest) {
         applicationId, // Include applicationId for tracking
         loanTypeId: appData?.loanTypeId,
         responses: appData?.responses || {},
-        currentSectionIndex: 0, // Start at beginning for submitted apps
-        completedSections: [], // Reset completion status
+        currentSectionIndex: 0,
+        completedSections: [],
+        submitted: true, // Flag that this app is already submitted
       });
     }
 

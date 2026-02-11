@@ -68,11 +68,19 @@ export default function DocumentUploadPage() {
 
       // Only fetch documents and workbooks if loanTypeId is available
       if (tokenResult.loanTypeId) {
-        // Fetch required documents and workbook templates in parallel
-        const [docsResponse, workbooksResponse] = await Promise.all([
+        // Fetch required documents, workbook templates, and already-uploaded docs in parallel
+        const [docsResponse, workbooksResponse, uploadedResponse] = await Promise.all([
           fetch(`/api/documents/required?loanTypeId=${tokenResult.loanTypeId}`),
           fetch(`/api/documents/workbooks?loanTypeId=${tokenResult.loanTypeId}`),
+          fetch(`/api/documents/application?applicationId=${tokenResult.applicationId}`),
         ]);
+
+        // Parse already-uploaded documents from Firestore
+        let uploadedDocs: Record<string, { url: string; fileName: string }> = {};
+        if (uploadedResponse.ok) {
+          const uploadedResult = await uploadedResponse.json();
+          uploadedDocs = uploadedResult.documents || {};
+        }
 
         const docsResult = await docsResponse.json();
         if (docsResult.documents && Array.isArray(docsResult.documents)) {
@@ -82,6 +90,9 @@ export default function DocumentUploadPage() {
             acceptedFormats: doc.acceptedFormats || ['PDF', 'JPG', 'JPEG', 'PNG'],
             maxFileSizeMB: doc.maxFileSizeMB || 10,
             required: doc.required ?? true,
+            // Merge upload status from Firestore
+            uploaded: !!uploadedDocs[doc.id],
+            fileUrl: uploadedDocs[doc.id]?.url || undefined,
           }));
           setDocuments(sanitizedDocs);
         }
@@ -398,6 +409,7 @@ interface DocumentCardProps {
 function DocumentCard({ document, onUpload, uploading }: DocumentCardProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [showReplace, setShowReplace] = useState(false);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -405,14 +417,12 @@ function DocumentCard({ document, onUpload, uploading }: DocumentCardProps) {
 
     setValidationError(null);
 
-    // Validate file size
     const maxFileSizeMB = document.maxFileSizeMB || 10;
     if (file.size > maxFileSizeMB * 1024 * 1024) {
       setValidationError(`File too large. Maximum size: ${maxFileSizeMB}MB`);
       return;
     }
 
-    // Validate file type (if acceptedFormats is defined)
     const ext = file.name.split('.').pop()?.toUpperCase();
     const acceptedFormats = document.acceptedFormats || ['PDF', 'JPG', 'JPEG', 'PNG'];
     if (!ext || !acceptedFormats.includes(ext)) {
@@ -429,6 +439,7 @@ function DocumentCard({ document, onUpload, uploading }: DocumentCardProps) {
     if (selectedFile && !validationError) {
       onUpload(document.id, selectedFile);
       setSelectedFile(null);
+      setShowReplace(false);
     }
   };
 
@@ -459,6 +470,72 @@ function DocumentCard({ document, onUpload, uploading }: DocumentCardProps) {
         )}
       </div>
 
+      {/* Already uploaded - show file info and replace option */}
+      {document.uploaded && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            {document.fileUrl && (
+              <a
+                href={document.fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+              >
+                View uploaded file →
+              </a>
+            )}
+            {!showReplace && (
+              <button
+                onClick={() => setShowReplace(true)}
+                className="text-sm text-gray-500 hover:text-gray-700 underline"
+              >
+                Replace file
+              </button>
+            )}
+          </div>
+
+          {showReplace && (
+            <div className="border-t border-gray-100 pt-3 mt-2 space-y-3">
+              <p className="text-xs text-gray-500">Select a new file to replace the current upload:</p>
+              <input
+                type="file"
+                accept={(document.acceptedFormats || ['PDF', 'JPG', 'JPEG', 'PNG']).map((f) => `.${f.toLowerCase()}`).join(',')}
+                onChange={handleFileSelect}
+                disabled={uploading}
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
+              />
+
+              {validationError && (
+                <p className="text-sm text-red-600">{validationError}</p>
+              )}
+
+              {selectedFile && !validationError && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">
+                    {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)}MB)
+                  </span>
+                  <button
+                    onClick={handleUpload}
+                    disabled={uploading}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {uploading ? 'Uploading...' : 'Replace'}
+                  </button>
+                </div>
+              )}
+
+              <button
+                onClick={() => { setShowReplace(false); setSelectedFile(null); setValidationError(null); }}
+                className="text-xs text-gray-400 hover:text-gray-600"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Not yet uploaded - show file input */}
       {!document.uploaded && (
         <div className="space-y-3">
           <input
@@ -488,17 +565,6 @@ function DocumentCard({ document, onUpload, uploading }: DocumentCardProps) {
             </div>
           )}
         </div>
-      )}
-
-      {document.uploaded && document.fileUrl && (
-        <a
-          href={document.fileUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
-        >
-          View uploaded file →
-        </a>
       )}
     </div>
   );

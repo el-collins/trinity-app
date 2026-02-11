@@ -370,23 +370,27 @@ export const useFormStore = create<FormStore>()(
         console.log('Generated upload token:', token);
         console.log('Upload link:', uploadLink);
 
-        // Send the document request email as a backup (so they can continue later)
-        const emailResponse = await fetch('/api/documents/request-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: applicantEmail,
-            firstName: responses['contact_first_name'] || responses['first_name'] || 'Applicant',
-            loanType: structure.name,
-            loanTypeId,
-            uploadLink,
-          }),
-        });
+        // Only send the document request email on first submission (not on re-submission/update)
+        if (!applicationId) {
+          const emailResponse = await fetch('/api/documents/request-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: applicantEmail,
+              firstName: responses['contact_first_name'] || responses['first_name'] || 'Applicant',
+              loanType: structure.name,
+              loanTypeId,
+              uploadLink,
+            }),
+          });
 
-        if (emailResponse.ok) {
-          console.log('Document collection email sent successfully');
+          if (emailResponse.ok) {
+            console.log('Document collection email sent successfully');
+          } else {
+            console.error('Failed to send document email. Status:', emailResponse.status);
+          }
         } else {
-          console.error('Failed to send document email. Status:', emailResponse.status);
+          console.log('Skipping document email - this is a re-submission (applicationId:', applicationId, ')');
         }
       } else {
         console.error('Failed to generate token. Status:', tokenResponse.status);
@@ -471,7 +475,11 @@ export const useFormStore = create<FormStore>()(
             completedSections: state.completedSections || [],
           });
 
-          toast.success('Application resumed successfully');
+          toast.success(
+            state.submitted
+              ? 'Application resumed. Review your responses and re-submit to upload documents.'
+              : 'Application resumed successfully'
+          );
           return true;
         } catch (error) {
           console.error('Failed to load from URL:', error);
