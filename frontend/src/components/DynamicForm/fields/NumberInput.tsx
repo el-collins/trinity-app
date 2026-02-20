@@ -50,7 +50,8 @@ export default function NumberInput({ field, value, error, onChange }: NumberInp
 
   // Format number with thousand separators
   const formatWithCommas = (num: number): string => {
-    if (isNaN(num) || num === 0) return '';
+    if (isNaN(num)) return '';
+    if (num === 0) return '0';
     // Handle decimals for currency
     if (isCurrency) {
       const parts = num.toString().split('.');
@@ -70,11 +71,13 @@ export default function NumberInput({ field, value, error, onChange }: NumberInp
 
   // Sync display value with actual value
   useEffect(() => {
-    const numValue = typeof value === 'string' ? parseFloat(value) : value;
-    if (!isNaN(numValue) && numValue !== 0) {
-      setDisplayValue(formatWithCommas(numValue));
-    } else if (value === '' || value === 0) {
+    if (value === '' || value === undefined || value === null) {
       setDisplayValue('');
+      return;
+    }
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    if (!isNaN(numValue)) {
+      setDisplayValue(formatWithCommas(numValue));
     }
   }, [value, isCurrency]);
 
@@ -140,8 +143,9 @@ export default function NumberInput({ field, value, error, onChange }: NumberInp
       return displayValue;
     }
     // For regular numbers
+    if (value === '' || value === undefined || value === null) return '';
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
-    return isNaN(numValue) || numValue === 0 ? '' : numValue.toString();
+    return isNaN(numValue) ? '' : numValue.toString();
   };
 
   const getPrefix = () => {

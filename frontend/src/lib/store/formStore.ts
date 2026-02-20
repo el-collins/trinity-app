@@ -222,8 +222,6 @@ export const useFormStore = create<FormStore>()(
         set({ isSubmitting: true });
         try {
           const { responses, loanTypeId, structure, applicationId } = get();
-
-          console.log('Application response:', responses);
           
           if (!structure || !loanTypeId) {
             throw new Error('Form structure not loaded');
@@ -367,9 +365,6 @@ export const useFormStore = create<FormStore>()(
         generatedToken = token;
         const uploadLink = `${window.location.origin}/documents/upload/${token}`;
 
-        console.log('Generated upload token:', token);
-        console.log('Upload link:', uploadLink);
-
         // Only send the document request email on first submission (not on re-submission/update)
         if (!applicationId) {
           const emailResponse = await fetch('/api/documents/request-email', {
@@ -488,7 +483,13 @@ export const useFormStore = create<FormStore>()(
         }
       },
       
-      resetForm: () => set(initialState),
+      resetForm: () => {
+        // Clear stale referral data when starting a new application
+        if (typeof window !== 'undefined') {
+          try { localStorage.removeItem('trinityiq_referral_data'); } catch {}
+        }
+        set(initialState);
+      },
       
       // UI State
       setLoading: (loading) => set({ isLoading: loading }),

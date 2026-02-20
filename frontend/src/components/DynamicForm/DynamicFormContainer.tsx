@@ -110,16 +110,13 @@ export default function DynamicFormContainer({
         if (isComingFromQuickApp) {
           try {
             const { responses: quickAppResponses } = useFormStore.getState();
-            console.log('Fetching field derivations for auto-fill...');
 
             const derivationsResponse = await fetch('/api/neo4j/field-derivations');
             if (derivationsResponse.ok) {
               const derivations: FieldDerivation[] = await derivationsResponse.json();
-              console.log('Field derivations loaded:', derivations.length);
 
               // Apply derivations to get pre-filled values
               const derivedResults = applyDerivations(derivations, quickAppResponses);
-              console.log('Derived field values:', derivedResults);
 
               // Pre-fill each derived field
               const filledFields: string[] = [];
@@ -351,11 +348,31 @@ export default function DynamicFormContainer({
 
   // Safety check: ensure current section exists
   if (!currentSection) {
+    console.error('[DynamicForm] currentSection is undefined:', {
+      sectionsCount: structure.sections.length,
+      currentSectionIndex,
+      sectionIds: structure.sections.map((s: any) => s.id),
+    });
+
+    // If structure has sections but index is out of bounds, reset to first section
+    if (structure.sections.length > 0) {
+      goToSection(0);
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading section...</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Structure has 0 sections - show error instead of spinning forever
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading section...</p>
+          <p className="text-red-600 mb-2">No form sections found for this loan type.</p>
+          <p className="text-gray-500 text-sm">The loan type configuration may be incomplete.</p>
         </div>
       </div>
     );
@@ -425,8 +442,6 @@ export default function DynamicFormContainer({
         );
 
         if (nextSectionIndex !== -1) {
-          console.log(`AI skipping to section: ${decision.data.nextSectionId}`);
-          console.log(`Reasoning: ${decision.reasoning}`);
           goToSection(nextSectionIndex);
         } else {
           // Fallback if section not found
@@ -434,8 +449,6 @@ export default function DynamicFormContainer({
         }
       } else if (decision.action === 'show_section') {
         // AI says proceed to next section
-        console.log(`AI proceeding to next section`);
-        console.log(`Reasoning: ${decision.reasoning}`);
         nextSection();
       } else {
         // Unknown action, fallback

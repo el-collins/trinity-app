@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DynamicFormContainer from '@/components/DynamicForm/DynamicFormContainer';
 import LoanTypeSelection from '@/components/LoanTypeSelection';
 import { useRouter } from 'next/navigation';
@@ -13,16 +13,18 @@ export default function QuickAppPage() {
   const [quickAppCompleted, setQuickAppCompleted] = useState(false);
 
   // Capture referral tracking params from URL on page load
-  const { referralData, hasReferral } = useReferralTracking();
+  // If no referral params in URL, clears stale data from previous sessions
+  const { referralData, hasReferral, clearReferralData } = useReferralTracking();
 
-  // Log referral data for debugging
-  if (hasReferral && referralData) {
-    console.log('[QuickApp] Referral tracking active:', {
-      referralCode: referralData.referralCode,
-      agentId: referralData.agentId,
-      utmCampaign: referralData.utmCampaign,
-    });
-  }
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasParams = urlParams.has('ref') || urlParams.has('agent') || urlParams.has('am_id') ||
+      urlParams.has('utm_source') || urlParams.has('utm_campaign');
+    if (!hasParams) {
+      clearReferralData();
+    }
+  }, [clearReferralData]);
 
   // Check if user completed Quick App by checking for the know_loan_type response
   const handleQuickAppComplete = () => {

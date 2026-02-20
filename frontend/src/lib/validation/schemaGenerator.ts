@@ -83,6 +83,10 @@ export function generateFieldSchema(field: FormField): z.ZodTypeAny {
         } else if (fieldType === 'checkbox') {
           // Checkbox fields need special handling - must be true for consent
           // This is handled by the 'accepted' rule below
+        } else if (fieldType === 'number' || fieldType === 'currency' || fieldType === 'percentage') {
+          // For number fields, "required" means a value must be provided
+          // z.coerce.number() already validates the input is numeric
+          // Don't apply .min(1) which would reject 0 as a valid answer
         } else {
           schema = (schema as z.ZodString).min(1, `${field.label} is required`);
         }

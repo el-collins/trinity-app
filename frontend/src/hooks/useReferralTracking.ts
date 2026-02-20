@@ -46,7 +46,6 @@ export function useReferralTracking() {
       if (stored) {
         const parsed = JSON.parse(stored) as ReferralData;
         setReferralData(parsed);
-        console.log('[ReferralTracking] Loaded existing referral data:', parsed);
       }
     } catch (error) {
       console.error('[ReferralTracking] Error loading stored data:', error);
