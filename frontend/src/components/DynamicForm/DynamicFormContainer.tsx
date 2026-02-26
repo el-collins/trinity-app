@@ -348,12 +348,6 @@ export default function DynamicFormContainer({
 
   // Safety check: ensure current section exists
   if (!currentSection) {
-    console.error('[DynamicForm] currentSection is undefined:', {
-      sectionsCount: structure.sections.length,
-      currentSectionIndex,
-      sectionIds: structure.sections.map((s: any) => s.id),
-    });
-
     // If structure has sections but index is out of bounds, reset to first section
     if (structure.sections.length > 0) {
       goToSection(0);
