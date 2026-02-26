@@ -159,8 +159,9 @@ export default function DynamicFormContainer({
             goToSection(0);
           }
         } else {
-          // Not coming from Quick App, start at beginning
-          goToSection(0);
+          const { currentSectionIndex: persistedIndex } = useFormStore.getState();
+          const maxIndex = Math.max(0, transformedData.sections.length - 1);
+          goToSection(Math.min(persistedIndex, maxIndex));
         }
 
         // AFTER structure is loaded, load resume token if present
@@ -177,11 +178,6 @@ export default function DynamicFormContainer({
     fetchFormStructure();
   }, [loanTypeId, setStructure, setLoanTypeId, setLoading, loadFromURL]);
 
-  // URL sync is now disabled to avoid 431 errors
-  // State is persisted via localStorage and database-backed resume tokens
-
-  // Watch for additional_owners_count changes and duplicate owner sections
-  
   useEffect(() => {
     if (!structure) return;
 
@@ -372,7 +368,13 @@ export default function DynamicFormContainer({
     );
   }
 
-  const isFirstSection = currentSectionIndex === 0;
+  // When coming from Quick App, the contact section was pre-filled and skipped.
+  // Disable Previous when the user is on the first section they actually see.
+  const contactSectionIds = ['contact', 'contact_info', 'quick_app_contact'];
+  const firstVisibleIndex = isFromQuickApp
+    ? Math.max(0, structure.sections.findIndex((s) => !contactSectionIds.includes(s.id)))
+    : 0;
+  const isFirstSection = currentSectionIndex <= firstVisibleIndex;
   const isLastSection = currentSectionIndex === structure.sections.length - 1;
 
   // AI-powered navigation handler
