@@ -1202,10 +1202,6 @@ You can Unsubscribe From Emails.
       };
 
       const info = await this.transporter.sendMail(mailOptions);
-      console.log('Resume link email sent successfully:', {
-        messageId: info.messageId,
-        recipient: recipientEmail,
-      });
 
       return true;
     } catch (error) {
