@@ -52,6 +52,16 @@ export async function POST(request: NextRequest) {
     let finalApplicationId: string;
     let isUpdate = false;
 
+    // Denormalized summary fields — stored at top level so the admin list
+    // can use .select() and skip downloading the full responses blob.
+    const summary = {
+      businessName: responses['business_name'] || responses['legal_business_name'] || null,
+      contactName: `${responses['first_name'] || responses['contact_first_name'] || ''} ${responses['last_name'] || responses['contact_last_name'] || ''}`.trim() || null,
+      contactEmail: applicantEmail || null,
+      contactPhone: responses['business_phone'] || responses['phone'] || responses['mobile_phone'] || null,
+      requestedAmount: responses['requested_amount'] || responses['loan_amount'] || responses['desired_funding_amount'] || null,
+    };
+
     // CHECK: If applicationId is provided, UPDATE existing application
     if (applicationId) {
       isUpdate = true;
@@ -78,6 +88,7 @@ export async function POST(request: NextRequest) {
         submittedAt: submittedAt || new Date().toISOString(),
         updatedAt: serverTimestamp(),
         applicantEmail: applicantEmail || null,
+        ...summary,
         // Preserve original metadata
         createdAt: existingData.createdAt,
         version: existingData.version || 1,
@@ -146,6 +157,7 @@ export async function POST(request: NextRequest) {
         updatedAt: serverTimestamp(),
         // Data versioning fields
         applicantEmail: applicantEmail || null,
+        ...summary,
         version: applicationVersion,
         previousApplicationIds: previousApplications.map(app => app.id),
         // Preserve initial interaction data

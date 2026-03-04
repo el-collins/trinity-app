@@ -363,7 +363,8 @@ export const useFormStore = create<FormStore>()(
       if (tokenResponse.ok) {
         const { token } = await tokenResponse.json();
         generatedToken = token;
-        const uploadLink = `${window.location.origin}/documents/upload/${token}`;
+        const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.financetrinity.com';
+        const uploadLink = `${appBaseUrl}/documents/upload/${token}`;
 
         // Only send the document request email on first submission (not on re-submission/update)
         if (!applicationId) {
