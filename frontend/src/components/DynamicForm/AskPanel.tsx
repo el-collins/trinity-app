@@ -14,7 +14,15 @@ interface AskResponse {
   abstained: boolean;
 }
 
-export default function AskPanel({ loanTypeId, fieldId }: { loanTypeId: string; fieldId?: string }) {
+export default function AskPanel({
+  loanTypeId,
+  fieldId,
+  label = 'Have a question about this loan?',
+}: {
+  loanTypeId: string;
+  fieldId?: string;
+  label?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
@@ -56,7 +64,7 @@ export default function AskPanel({ loanTypeId, fieldId }: { loanTypeId: string; 
         className="w-full px-4 py-3 text-left text-sm font-medium text-gray-800"
         aria-expanded={open}
       >
-        Have a question about this loan?
+        {label}
       </button>
       {open && (
         <div className="border-t border-gray-200 p-4">

@@ -2,6 +2,8 @@
 
 import { FormSection } from '@/lib/types/schema';
 import DynamicField from './DynamicField';
+import AskPanel from './AskPanel';
+import { useFormStore } from '@/lib/store/formStore';
 
 interface DynamicSectionProps {
   section: FormSection;
@@ -24,6 +26,7 @@ const formatSectionTitle = (text: string): string => {
 export default function DynamicSection({ section }: DynamicSectionProps) {
   // Get the display title - use label if available, otherwise format the name
   const displayTitle = section.label || formatSectionTitle(section.name);
+  const loanTypeId = useFormStore((state) => state.loanTypeId);
 
   return (
     <div className="bg-white rounded-lg shadow-md p-8">
@@ -42,7 +45,13 @@ export default function DynamicSection({ section }: DynamicSectionProps) {
         {section.fields
           .sort((a, b) => a.order - b.order)
           .map((field) => (
-            <DynamicField key={field.id} field={field} />
+            <div key={field.id}>
+              <DynamicField field={field} />
+              {/* Field-scoped Q&A; self-gated by NEXT_PUBLIC_ENABLE_RAG */}
+              {field.helpText && loanTypeId && (
+                <AskPanel loanTypeId={loanTypeId} fieldId={field.id} label={`Ask about "${field.label}"`} />
+              )}
+            </div>
           ))}
       </div>
     </div>
