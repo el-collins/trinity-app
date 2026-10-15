@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main, collins, 'feat/**']
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: bun install --frozen-lockfile
+      # The repo had no tests or CI before; lint only the files added since, not the legacy code.
+      - name: Lint new code
+        run: >
+          bunx eslint
+          src/lib/rag src/lib/auth src/lib/graph
+          src/lib/ai/http.ts src/lib/ai/http.test.ts src/lib/ai/client.test.ts
+          src/app/api/rag src/app/api/admin/rag src/app/admin/knowledge-base
+          src/components/DynamicForm/AskPanel.tsx
+          scripts/rag-ingest.ts scripts/rag-eval.ts scripts/rag-field-help.ts scripts/graph-validate.ts
+      - run: bun run typecheck
+      - run: bun run test
+      - run: bun run build
+        env:
+          NEXT_PUBLIC_ENABLE_RAG: 'true'
+
+  integration:
+    runs-on: ubuntu-latest
+    needs: checks
+    services:
+      neo4j:
+        image: neo4j:5.26-community
+        ports: ['7687:7687']
+        env:
+          NEO4J_AUTH: neo4j/ci-password-only
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p ci-password-only 'RETURN 1'"
+          --health-interval 5s --health-timeout 5s --health-retries 30
+    env:
+      NEO4J_URI: bolt://localhost:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ci-password-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Seed graph
+        run: |
+          for f in db/seed/0[2-5]-*.cypher db/seed/0[7-9]-*.cypher db/seed/1[0-1]-*.cypher; do
+            docker run --rm --network host -v "$PWD:/w" neo4j:5.26-community \
+              cypher-shell -a bolt://localhost:7687 -u neo4j -p ci-password-only -f "/w/$f"
+          done
+      - run: bun install --frozen-lockfile
+        working-directory: frontend
+      - run: bun run graph:validate
+        working-directory: frontend
+      - run: bun run test:integration
+        working-directory: frontend
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: checks
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t trinity-app ./frontend
