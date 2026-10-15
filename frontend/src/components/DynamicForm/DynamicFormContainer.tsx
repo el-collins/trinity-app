@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useFormStore } from '@/lib/store/formStore';
 import DynamicSection from './DynamicSection';
+import AskPanel from './AskPanel';
 import ReviewPage from './ReviewPage';
 import DocumentCollectionStep from './DocumentCollectionStep';
 import SaveAndExitModal from '../Modals/SaveAndExitModal';
@@ -573,6 +574,9 @@ export default function DynamicFormContainer({
 
       {/* Current Section */}
       <DynamicSection section={currentSection} />
+
+      {/* Loan document Q&A (self-gated by NEXT_PUBLIC_ENABLE_RAG) */}
+      <AskPanel loanTypeId={loanTypeId} />
 
       {/* Navigation Buttons */}
       <div className="mt-8 flex justify-between">
