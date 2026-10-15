@@ -35,13 +35,21 @@ export function getRag(): RagRuntime {
       llm: aiClient,
       minScore: Number(process.env.RAG_MIN_SCORE ?? '0.65'),
     });
+    const ready = store.ensureSchema().catch(async (error) => {
+      // Neo4j was not reachable yet: drop this runtime so the next request retries from scratch
+      // instead of reusing a rejected promise for the life of the process.
+      if (globalForRag.__ragRuntime?.driver === driver) globalForRag.__ragRuntime = undefined;
+      await driver.close().catch(() => {});
+      throw error;
+    });
+    ready.catch(() => {}); // callers await `ready`; this only prevents an unhandled-rejection crash
     globalForRag.__ragRuntime = {
       driver,
       store,
       embedder,
       service,
       limiter: new RateLimiter({ limit: 10, windowMs: 60_000 }),
-      ready: store.ensureSchema(),
+      ready,
     };
   }
   return globalForRag.__ragRuntime;

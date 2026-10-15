@@ -40,6 +40,10 @@ export function createRagService(deps: {
         const hit = cache.get(key);
         if (hit) return { ...hit, cached: true };
 
+        if (!(await deps.store.loanTypesExist([input.loanTypeId]))) {
+          throw new RagInputError('Unknown loan type');
+        }
+
         const chunks = await retrieve({ embedder: deps.embedder, store: deps.store }, input);
         const best = chunks.reduce((m, c) => Math.max(m, c.score), 0);
 
@@ -49,7 +53,9 @@ export function createRagService(deps: {
         } else {
           result = await answerQuestion({ question: input.question, chunks, llm: deps.llm });
         }
-        cache.set(key, result);
+        // Nothing retrieved can mean "no documents yet" or a saturated vector candidate pool;
+        // don't pin that abstention in the cache for the TTL.
+        if (chunks.length > 0) cache.set(key, result);
         return { ...result, cached: false };
       } catch (error) {
         if (error instanceof RagInputError || error instanceof RagUpstreamError) throw error;

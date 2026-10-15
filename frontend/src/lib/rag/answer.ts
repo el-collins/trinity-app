@@ -18,10 +18,15 @@ export function buildPrompt(question: string, chunks: RetrievedChunk[]): { syste
   ].join('\n');
 
   const docs = chunks
-    .map((c, i) => `<doc id="${i + 1}" title="${c.docTitle.replace(/"/g, "'")}">\n${c.text}\n</doc>`)
+    .map((c, i) => `<doc id="${i + 1}" title="${escapeMarkup(c.docTitle).replace(/"/g, "'")}">\n${escapeMarkup(c.text)}\n</doc>`)
     .join('\n');
 
-  return { system, user: `${docs}\n\nQuestion: ${question}` };
+  return { system, user: `${docs}\n\nQuestion: ${escapeMarkup(question)}` };
+}
+
+// Document text, titles and questions are untrusted: stop them closing or opening <doc> tags.
+function escapeMarkup(text: string): string {
+  return text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 const CITATION_RE = /\[doc\s+(\d+)\]/gi;

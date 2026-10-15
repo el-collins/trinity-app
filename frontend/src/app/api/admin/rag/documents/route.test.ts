@@ -71,4 +71,27 @@ describe('admin RAG documents API', () => {
     expect(deleteDoc).toHaveBeenCalledWith('d1');
     expect(bumpCorpusVersion).toHaveBeenCalled();
   });
+
+  it('returns 413 from content-length before reading the body', async () => {
+    const res = await POST(req('POST', { 'x-rag-admin-key': KEY, 'content-length': String(25 * 1024 * 1024) }, new FormData()));
+    expect(res.status).toBe(413);
+  });
+
+  it('returns 400 for an over-long title', async () => {
+    const form = new FormData();
+    form.set('file', new File(['hello world, this is a long enough document to index'], 'a.md'));
+    form.set('title', 'x'.repeat(300));
+    form.append('loanTypeIds', 'sba');
+    const res = await POST(req('POST', { 'x-rag-admin-key': KEY }, form));
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for too many loan types', async () => {
+    const form = new FormData();
+    form.set('file', new File(['hello world, this is a long enough document to index'], 'a.md'));
+    form.set('title', 'ok');
+    for (let i = 0; i < 25; i++) form.append('loanTypeIds', 'lt' + i);
+    const res = await POST(req('POST', { 'x-rag-admin-key': KEY }, form));
+    expect(res.status).toBe(400);
+  });
 });

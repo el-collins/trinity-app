@@ -34,7 +34,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await rag.ready;
+    try {
+      await rag.ready;
+    } catch (error) {
+      // Neo4j not reachable yet: the runtime resets itself, so a later request retries.
+      console.error('rag_not_ready', error instanceof Error ? error.message : 'unknown');
+      return NextResponse.json({ error: 'Answering is temporarily unavailable' }, { status: 503 });
+    }
     const result = await rag.service.ask(parsed.value);
     return NextResponse.json(result);
   } catch (error) {
