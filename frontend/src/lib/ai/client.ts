@@ -1,5 +1,6 @@
 import { getAIConfig } from './config';
 import { AIMessage, AIResponse } from './types';
+import { fetchWithRetry } from './http';
 
 
 /**
@@ -10,68 +11,69 @@ export class AIClient {
   private config = getAIConfig();
 
   async chat(messages: AIMessage[], systemPrompt?: string): Promise<AIResponse> {
+    const started = Date.now();
+    let result: AIResponse;
     switch (this.config.provider) {
       case 'anthropic':
-        return this.chatAnthropic(messages, systemPrompt);
-      
+        result = await this.chatAnthropic(messages, systemPrompt);
+        break;
+
       case 'openai':
-        return this.chatOpenAI(messages, systemPrompt);
-      
+        result = await this.chatOpenAI(messages, systemPrompt);
+        break;
+
       case 'gemini':
-        return this.chatGemini(messages, systemPrompt);
-      
+        result = await this.chatGemini(messages, systemPrompt);
+        break;
+
       case 'azure_openai':
-        return this.chatAzureOpenAI(messages, systemPrompt);
-      
+        result = await this.chatAzureOpenAI(messages, systemPrompt);
+        break;
+
       default:
         throw new Error(`Unsupported provider: ${this.config.provider}`);
     }
+    console.info(
+      JSON.stringify({
+        event: 'ai_call',
+        provider: this.config.provider,
+        latencyMs: Date.now() - started,
+        inputTokens: result.usage?.inputTokens ?? null,
+        outputTokens: result.usage?.outputTokens ?? null,
+      })
+    );
+    return result;
   }
 
   private async chatAnthropic(messages: AIMessage[], systemPrompt?: string): Promise<AIResponse> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    const { response } = await fetchWithRetry('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': this.config.apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: this.config.model,
+        max_tokens: 2048,
+        system: systemPrompt,
+        messages: messages.filter((m) => m.role !== 'system'),
+      }),
+    });
 
-    try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': this.config.apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          max_tokens: 2048,
-          system: systemPrompt,
-          messages: messages.filter(m => m.role !== 'system'),
-        }),
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Anthropic API error: ${response.statusText} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      
-      return {
-        content: data.content[0].text,
-        usage: {
-          inputTokens: data.usage.input_tokens,
-          outputTokens: data.usage.output_tokens,
-        },
-      };
-    } catch (error) {
-      clearTimeout(timeoutId);
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('Anthropic API request timed out after 30 seconds. Check your network connection or firewall settings.');
-      }
-      throw error;
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Anthropic API error: ${response.statusText} - ${errorText}`);
     }
+
+    const data = await response.json();
+    return {
+      content: data.content[0].text,
+      usage: {
+        inputTokens: data.usage.input_tokens,
+        outputTokens: data.usage.output_tokens,
+      },
+    };
   }
 
   private async chatOpenAI(messages: AIMessage[], systemPrompt?: string): Promise<AIResponse> {
@@ -79,7 +81,7 @@ export class AIClient {
       ? [{ role: 'system' as const, content: systemPrompt }, ...messages]
       : messages;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const { response } = await fetchWithRetry('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -121,7 +123,7 @@ export class AIClient {
       });
     }
 
-    const response = await fetch(
+    const { response } = await fetchWithRetry(
       `https://generativelanguage.googleapis.com/v1beta/models/${this.config.model}:generateContent?key=${this.config.apiKey}`,
       {
         method: 'POST',
@@ -164,7 +166,7 @@ export class AIClient {
 
     const url = `${endpoint}/openai/deployments/${deploymentName}/chat/completions?api-version=${apiVersion}`;
 
-    const response = await fetch(url, {
+    const { response } = await fetchWithRetry(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
