@@ -4,7 +4,7 @@ import { config } from '../config';
 /**
  * Helper to convert all Neo4j integers in an object to JavaScript numbers
  */
-function convertIntegers(obj: any): any {
+export function convertIntegers(obj: any): any {
   if (obj === null || obj === undefined) return obj;
 
   if (Integer.isInteger(obj)) {
