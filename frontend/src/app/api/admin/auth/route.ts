@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { firestore } from '@/lib/firebase/admin';
 import bcrypt from 'bcryptjs';
+import { signAdminSession, ADMIN_COOKIE, adminCookieOptions } from '@/lib/auth/adminSession';
 
 export async function POST(request: NextRequest) {
   try {
@@ -96,15 +97,21 @@ export async function POST(request: NextRequest) {
       lastLogin: new Date(),
     });
 
-    return NextResponse.json({
-      success: true,
-      user: {
-        id: userDoc.id,
-        email: userData.email,
-        name: userData.name,
-        role: userData.role || 'admin',
-      },
-    });
+    const user = {
+      id: userDoc.id,
+      email: userData.email,
+      name: userData.name,
+      role: userData.role || 'admin',
+    };
+    const res = NextResponse.json({ success: true, user });
+    if (process.env.ADMIN_SESSION_SECRET) {
+      res.cookies.set(
+        ADMIN_COOKIE,
+        signAdminSession({ id: user.id, email: user.email, role: user.role }),
+        adminCookieOptions
+      );
+    }
+    return res;
   } catch (error) {
     console.error('Admin auth error:', error);
     return NextResponse.json(
