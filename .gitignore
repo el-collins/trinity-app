@@ -3,9 +3,11 @@ firestore.rules
 
 # Scripts & Documentation
 Cypher scripts/
-docs/
+docs/*
+!docs/superpowers/
 TEST/
 
 # System Files
 .DS_Store
 Thumbs.db
+.env.docker
