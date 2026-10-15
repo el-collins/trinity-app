@@ -5,10 +5,11 @@ import { RagUpstreamError } from '@/lib/rag/service';
 
 const ask = vi.fn();
 let limiter = new RateLimiter({ limit: 10 });
+let ready: Promise<void> = Promise.resolve();
 
 vi.mock('@/lib/rag', () => ({
   ragEnabled: () => process.env.RAG_ENABLED === 'true',
-  getRag: () => ({ service: { ask }, limiter, ready: Promise.resolve() }),
+  getRag: () => ({ service: { ask }, limiter, ready }),
 }));
 
 import { POST } from './route';
@@ -24,6 +25,7 @@ beforeEach(() => {
   process.env.RAG_ENABLED = 'true';
   ask.mockReset();
   limiter = new RateLimiter({ limit: 10 });
+  ready = Promise.resolve();
 });
 
 describe('POST /api/rag/ask', () => {
@@ -52,6 +54,21 @@ describe('POST /api/rag/ask', () => {
     const res = await POST(post({ loanTypeId: 'sba', question: 'q' }, '9.9.9.9'));
     expect(res.status).toBe(429);
     expect(res.headers.get('retry-after')).toBeTruthy();
+  });
+
+  it('returns 503 (not 500) when Neo4j was not ready, without calling the service', async () => {
+    ready = Promise.reject(new Error('ServiceUnavailable'));
+    ready.catch(() => {});
+    const res = await POST(post({ loanTypeId: 'sba', question: 'q' }));
+    expect(res.status).toBe(503);
+    expect(ask).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an unknown loan type', async () => {
+    const { RagInputError } = await import('@/lib/rag/service');
+    ask.mockRejectedValue(new RagInputError('Unknown loan type'));
+    const res = await POST(post({ loanTypeId: 'zzz', question: 'q' }));
+    expect(res.status).toBe(400);
   });
 
   it('returns 502 when the upstream fails', async () => {

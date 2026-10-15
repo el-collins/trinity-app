@@ -222,8 +222,9 @@ export function createStore(driver: Driver): RagStore {
 
     async getCorpusVersion() {
       return run(async (s) => {
-        const r = await s.run(`MERGE (m:RagMeta {id:'corpus'}) ON CREATE SET m.version = 0 RETURN m.version AS v`);
-        return toNum(r.records[0].get('v'));
+        // Read-only (ensureSchema creates the node), so bogus requests never write to the graph.
+        const r = await s.run(`MATCH (m:RagMeta {id:'corpus'}) RETURN m.version AS v`);
+        return r.records.length === 0 ? 0 : toNum(r.records[0].get('v'));
       });
     },
 
