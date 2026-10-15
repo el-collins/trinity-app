@@ -44,3 +44,6 @@ next-env.d.ts
 /Cypher scripts
 docs
 TEST
+
+# rag eval reports
+/eval/results/
